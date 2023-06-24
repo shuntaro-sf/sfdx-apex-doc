@@ -1,0 +1,16 @@
+{
+  "sectionLabel": {
+    "signature": "SIGNATURE",
+    "parameters": "PARAMETERS",
+    "returnValue": "RETURN VALUE",
+    "paramDescription": "Description: ",
+    "paramType": "Type: "
+  },
+  "sectionDepth": {
+    "class": 2
+  },
+  "fileNameOfOutput": "README.md",
+  "keyTag": "usage",
+  "syntaxHighligherLang": "apex",
+  "resolveJsonModule": true
+}
