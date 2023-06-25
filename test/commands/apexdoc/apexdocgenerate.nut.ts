@@ -21,15 +21,17 @@ describe("apexdoc generate NUTs", () => {
     expect(result?.inputdir).to.equal("test/resources/classes");
     expect(result?.outputdir).to.equal("test/resources");
 
-    expect(result?.classInfo[0][1].Name).to.equal("getSelfSObjectRecords");
-    expect(result?.classInfo[0][1].Description).to.equal("Gets the records of sObjectType.");
-    expect(result?.classInfo[0][1].Signature).to.equal("public List<SObject> getSelfSObjectRecords(SoqlQueryClause soqlQueryClause)");
-    expect(result?.classInfo[0][1].Parameters[0].Name).to.equal("soqlQueryClause");
-    expect(result?.classInfo[0][1].Parameters[0].Type).to.equal("SoqlQueryClause");
-    expect(result?.classInfo[0][1].Parameters[0].Description).to.equal(
+    expect(result?.classInfos[0].Name).to.equal("DynamicDao");
+    expect(result?.classInfos[0].Description).to.equal("Class");
+    expect(result?.classInfos[0].Methods[1].Name).to.equal("getSelfSObjectRecords");
+    expect(result?.classInfos[0].Methods[1].Description).to.equal("Gets the records of sObjectType.");
+    expect(result?.classInfos[0].Methods[1].Signature).to.equal("public List<SObject> getSelfSObjectRecords(SoqlQueryClause soqlQueryClause)");
+    expect(result?.classInfos[0].Methods[1].Parameters[0].Name).to.equal("soqlQueryClause");
+    expect(result?.classInfos[0].Methods[1].Parameters[0].Type).to.equal("SoqlQueryClause");
+    expect(result?.classInfos[0].Methods[1].Parameters[0].Description).to.equal(
       "soqlQueryClause SoqlQueryClause object to be converted to a soql query string when extracting records."
     );
-    expect(result?.classInfo[0][1].ReturnValue).to.equal("List<SObject>");
+    expect(result?.classInfos[0].Methods[1].ReturnValue).to.equal("List<SObject>");
   });
 
   it("directory not found", () => {

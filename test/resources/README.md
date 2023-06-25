@@ -1,7 +1,11 @@
 <usage>
+## DynamicDao
+
+Class
+
 ### DynamicDao
 
-Constructor providing object type.
+Class
 
 ```apex
 SIGNATURE
@@ -271,6 +275,82 @@ RETURN VALUE
   String
 ```
 
+### InnerClass
+
+Gets the records of sObjectType.
+
+```apex
+SIGNATURE
+
+
+
+public InnerClass()
+
+
+
+RETURN VALUE
+
+
+```
+
+### innerMethod
+
+Gets the records of sObjectType.
+
+```apex
+SIGNATURE
+
+
+
+public String innerMethod()
+
+
+
+RETURN VALUE
+
+  String
+```
+
+### InnerClass
+
+#### InnerClass
+
+Gets the records of sObjectType.
+
+```apex
+SIGNATURE
+
+
+
+public InnerClass()
+
+
+
+RETURN VALUE
+
+
+```
+
+#### innerMethod
+
+Gets the records of sObjectType.
+
+```apex
+SIGNATURE
+
+
+
+public String innerMethod()
+
+
+
+RETURN VALUE
+
+  String
+```
+
+## NoneMethods
+
 ### invalidParamMethod
 
 ```apex
@@ -286,5 +366,7 @@ RETURN VALUE
 
   void
 ```
+
+## NoneMethods
 
 </usage>

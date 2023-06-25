@@ -137,22 +137,14 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     if (apexClassSignatureMatch === null) {
       return;
     }
+    classInfo.Name = this.getName(apexClassSignatureMatch[0]);
+    classInfo.Description = this.getDescription(apexClassSplitBySignature[0]);
 
-    const strsToExtractClassName = apexClassSignatureMatch[0].replace(/.$/, "").trim().split(/\s/);
-    classInfo.Name = strsToExtractClassName[strsToExtractClassName.length - 1];
-    const regExpForDoc = /\/\*\*[\s\S]*\*\//;
-    const doc = apexClassSplitBySignature[0].match(regExpForDoc);
-    if (doc !== null) {
-      const descriptionMatch = doc[0].match(/@description\s*.*/);
-      classInfo.Description = descriptionMatch !== null ? descriptionMatch[0].replace("@description", "").trim() : "";
-    }
-
-    const apexClassWithoutSignature = apexClass.replace(apexClassSignatureMatch[0], "").replace(/}$/, "");
     apexClassSignatureMatch.shift();
     apexClassSplitBySignature.shift();
     const innerApexClasses = this.getInnerApexClasses(apexClassSignatureMatch, apexClassSplitBySignature);
 
-    let apexClassWithoutInnerClasses = apexClassWithoutSignature;
+    let apexClassWithoutInnerClasses = apexClass.replace(apexClassSignatureMatch[0], "").replace(/}$/, "");
     for (const innerClass of innerApexClasses) {
       apexClassWithoutInnerClasses = apexClassWithoutInnerClasses.replace(innerClass, "");
     }
@@ -165,30 +157,39 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     }
   }
 
+  private getName(signatureMatchValue: string): string {
+    const regExpForParameters = /\(.*\)/;
+    const strsToExtractClassName = signatureMatchValue.replace(regExpForParameters, "").replace(/.$/, "").trim().split(/\s/);
+    return strsToExtractClassName[strsToExtractClassName.length - 1];
+  }
+
+  private getDescription(docAboveSignature: string): string {
+    const regExpOfDoc = /\/\*\*[\s\S]*\*\//;
+    const doc = docAboveSignature.match(regExpOfDoc);
+    if (doc === null) {
+      return "";
+    }
+    const descriptionMatch = doc[0].match(/@description\s*.*/);
+    return descriptionMatch !== null ? descriptionMatch[0].replace("@description", "").trim() : "";
+  }
+
   private collectMethodInfos(apexClass: string, classInfo: ClassInfo): void {
     const regExpOfEachMethods = /\s*public\s+.+\(.*\)\s*\{/g;
     const methods = apexClass.match(regExpOfEachMethods);
     const eachMethodSplit = apexClass.split(regExpOfEachMethods);
-
     if (methods === null) {
       return;
     }
-
     for (let idxOfMethod = 0; idxOfMethod < methods.length; idxOfMethod++) {
       const methodInfo = { Name: "", Description: "", Signature: "", Parameters: [] as ParameterInfo[], ReturnValue: "" };
+      methodInfo.Name = this.getName(methods[idxOfMethod]);
+
+      const regExpOfDoc = /\/\*\*[\s\S]*\*\//;
+      const doc = eachMethodSplit[idxOfMethod].match(regExpOfDoc);
+      methodInfo.Description = this.getDescription(eachMethodSplit[idxOfMethod]);
+      methodInfo.Signature = methods[idxOfMethod].replace("{", "").trim();
 
       const regExpForParameters = /\(.*\)/;
-      const strsToExtractMethodName = methods[idxOfMethod].replace(regExpForParameters, "").replace("{", "").trim().split(/\s/);
-      methodInfo.Name = strsToExtractMethodName[strsToExtractMethodName.length - 1];
-
-      const regExpForDoc = /\/\*\*[\s\S]*\*\//;
-      const doc = eachMethodSplit[idxOfMethod].match(regExpForDoc);
-      if (doc !== null) {
-        const descriptionMatch = doc[0].match(/@description\s*.*/);
-
-        methodInfo.Description = descriptionMatch !== null ? descriptionMatch[0].replace("@description", "").trim() : "";
-      }
-      methodInfo.Signature = methods[idxOfMethod].replace("{", "").trim();
       const strsToExtractParameters = methods[idxOfMethod].match(regExpForParameters);
       if (strsToExtractParameters !== null) {
         this.collectParamInfo(strsToExtractParameters, doc, methodInfo);
@@ -196,7 +197,6 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
       const strsToExtractReturnValue = methods[idxOfMethod].replace(regExpForParameters, "").replace("{", "").trim();
       const returnValue = strsToExtractReturnValue.replace("public", "").replace(methodInfo.Name, "").trim();
       methodInfo.ReturnValue = returnValue;
-
       classInfo.Methods.push(methodInfo);
     }
   }
