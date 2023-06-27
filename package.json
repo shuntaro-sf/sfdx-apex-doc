@@ -3,7 +3,7 @@
   "description": "SFDX plugin to generate Apex doc",
   "version": "2.0.0",
   "dependencies": {
-    "@oclif/core": "^2.8.2",
+    "@oclif/core": "^2.8.10",
     "@salesforce/core": "^3.34.8",
     "@salesforce/kit": "^3.0.1",
     "@salesforce/sf-plugins-core": "^2.4.3",
