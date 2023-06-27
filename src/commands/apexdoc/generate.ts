@@ -173,9 +173,6 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     }
     classInfo.Name = this.getName(apexClassSignatureMatch[0]);
     classInfo.Description = this.getDescription(apexClassSplitBySignature[0]);
-
-    apexClassSignatureMatch.shift();
-    apexClassSplitBySignature.shift();
     const innerApexClasses = this.popInnerApexClasses(apexClass, apexClassSignatureMatch, apexClassSplitBySignature);
 
     const apexClassWithoutInnerClasses = innerApexClasses.result.replace(apexClassSignatureMatch[0], "").replace(/}$/, "");
@@ -301,11 +298,12 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     let usageListStr = "";
     for (const classInfo of this.classInfos) {
       const readmeText = "[README]";
-      const readmeUrl = "(" + join(flags.repourl, "blob", flags.releasever, "README" + Generate.outputExtension) + ")";
-      const classHierarchy = readmeText + readmeUrl + "/" + classInfo.Name;
+      const readmeUrlDirs = [flags.repourl, "blob", flags.releasever, "README" + Generate.outputExtension, classInfo.Name];
+      const readmeUrl = "(" + readmeUrlDirs.join("/") + ")";
+      const classHierarchy = readmeText + readmeUrl;
       classUsageStr += this.getClassInfoUsageStr(classInfo, Generate.sectionDepth.class, classHierarchy, flags);
-      usageListStr +=
-        "- [" + classInfo.Name + "](" + join(flags.repourl, "blob", flags.releasever, classInfo.Name + Generate.outputExtension) + ")" + linebreak;
+      const urlDirs = [flags.repourl, "blob", flags.releasever, classInfo.Name + Generate.outputExtension];
+      usageListStr += "- [" + classInfo.Name + "](" + urlDirs.join("/") + ")" + linebreak;
       writeFileSync(join(flags.outputdir, flags.docsdir, classInfo.Name + Generate.outputExtension), classUsageStr, "utf8");
     }
     let readme = readFileSync(join(flags.outputdir, "README" + Generate.outputExtension), {
@@ -313,13 +311,12 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     });
 
     const regExpForUsage = new RegExp("<" + Generate.keyTag + ">[\\s\\S]*</" + Generate.keyTag + ">");
-    readme = readme.replace(regExpForUsage, "<" + Generate.keyTag + ">" + linebreak + usageListStr + "</" + Generate.keyTag + ">");
-    //    readme = readme.replace(regExpForUsage, "<" + Generate.keyTag + ">" + linebreak + classUsageStr + linebreak + "</" + Generate.keyTag + ">");
+    readme = readme.replace(
+      regExpForUsage,
+      "<" + Generate.keyTag + ">" + linebreak.repeat(2) + usageListStr + linebreak + "</" + Generate.keyTag + ">"
+    );
 
     writeFileSync(join(flags.outputdir, "README" + Generate.outputExtension), readme, "utf8");
-    //   for (const classInfo of this.classInfos) {
-    ////     writeFileSync(join(flags.outputdir, classInfo.Name, Generate.outputExtension), readme, "utf8");
-    //   }
   }
 
   private getClassInfoUsageStr(
@@ -343,14 +340,15 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     }
     let classUsageStr = classUsageStrs.join(linebreak.repeat(2));
 
-    if (classInfo.Classes.length !== 0) {
-      for (const innerClassInfo of classInfo.Classes) {
-        const text = "[" + classHierarchy + "]";
-        const url = "(" + join(flags.repourl, "blob", flags.releasever, classInfo.Name + Generate.outputExtension) + ")";
-        const innerClassHierarchy = text + url + "/" + innerClassInfo.Name;
-        classUsageStr += linebreak.repeat(2) + this.getClassInfoUsageStr(innerClassInfo, classSectionDepth + 1, innerClassHierarchy, flags);
-      }
+    // if (classInfo.Classes.length !== 0) {
+    for (const innerClassInfo of classInfo.Classes) {
+      const text = "[" + classHierarchy + "]";
+      const urlDirs = [flags.repourl, "blob", flags.releasever, classInfo.Name + Generate.outputExtension, innerClassInfo.Name];
+      const url = "(" + urlDirs.join("/") + ")";
+      const innerClassHierarchy = text + url;
+      classUsageStr += linebreak.repeat(2) + this.getClassInfoUsageStr(innerClassInfo, classSectionDepth + 1, innerClassHierarchy, flags);
     }
+    // }
     return classUsageStr + linebreak.repeat(2);
   }
 

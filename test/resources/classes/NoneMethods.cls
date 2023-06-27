@@ -1,2 +1,2 @@
-public inherited sharing class NoneMethods {
+private inherited sharing class NoneMethods {
 }

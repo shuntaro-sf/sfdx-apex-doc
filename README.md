@@ -119,11 +119,14 @@ Generates Apex doc to READ.md.
 
 ```
 USAGE
-  $ sf apexdoc generate -i <value> -o <value> [--json]
+  $ sf apexdoc generate -i <value> -o <value> [--json] [-d <value>] [-u <value>] [-v <value>]
 
 FLAGS
-  -i, --inputdir=<value>   (required) input directory that apex classes are stored in.
-  -o, --outputdir=<value>  (required) output directory that includes README.md.
+  -d, --docsdir=<value>     [default: docs] directory that Apex documentation markdown files are saved in.
+  -i, --inputdir=<value>    (required) input directory that apex classes are stored in.
+  -o, --outputdir=<value>   (required) output directory that includes README.md.
+  -u, --repourl=<value>     repository url that includes README.md and outputdir to save Apex documentations.
+  -v, --releasever=<value>  release version of repository.
 
 GLOBAL FLAGS
   --json  Format output as json.
