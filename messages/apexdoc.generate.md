@@ -14,6 +14,18 @@ input directory that apex classes are stored in.
 
 output directory that includes README.md.
 
+# docsdir-flags.name.summary
+
+directory that Apex documentation markdown files are saved in.
+
+# repourl-flags.name.summary
+
+repository url that includes README.md and outputdir to save Apex documentations.
+
+# releasever-flags.name.summary
+
+release version of repository.
+
 # examples
 
 - Generates Apex doc to README.md:

@@ -10,9 +10,7 @@ Class
 ```apex
 SIGNATURE
 
-
-
-public DynamicDao(System.Type sObjectType)
+  public DynamicDao(System.Type sObjectType)
 
 PARAMETERS
 
@@ -34,9 +32,7 @@ Gets the records of sObjectType.
 ```apex
 SIGNATURE
 
-
-
-public List<SObject> getSelfSObjectRecords(SoqlQueryClause soqlQueryClause)
+  public List<SObject> getSelfSObjectRecords(SoqlQueryClause soqlQueryClause)
 
 PARAMETERS
 
@@ -58,9 +54,7 @@ Gets the records of sObjectType.
 ```apex
 SIGNATURE
 
-
-
-public List<SObject> getSelfSObjectRecords(List<String> fieldFullNames)
+  public List<SObject> getSelfSObjectRecords(List<String> fieldFullNames)
 
 PARAMETERS
 
@@ -82,9 +76,7 @@ Gets the parent-records of sObjectType.
 ```apex
 SIGNATURE
 
-
-
-public List<SObject> getSObjectRecordsOfParent(SoqlQueryClause soqlQueryClause)
+  public List<SObject> getSObjectRecordsOfParent(SoqlQueryClause soqlQueryClause)
 
 PARAMETERS
 
@@ -106,9 +98,7 @@ Gets the parent-records of sObjectType.
 ```apex
 SIGNATURE
 
-
-
-public List<SObject> getSObjectRecordsOfParent(String parentRelationName, List<String> parentFieldFullNames)
+  public List<SObject> getSObjectRecordsOfParent(String parentRelationName, List<String> parentFieldFullNames)
 
 PARAMETERS
 
@@ -136,9 +126,7 @@ Gets the child-records of sObjectType.
 ```apex
 SIGNATURE
 
-
-
-public List<SObject> getSObjectRecordsInChild(SoqlQueryClause soqlQueryClause)
+  public List<SObject> getSObjectRecordsInChild(SoqlQueryClause soqlQueryClause)
 
 PARAMETERS
 
@@ -160,9 +148,7 @@ Gets the child-records of sObjectType.
 ```apex
 SIGNATURE
 
-
-
-public List<SObject> getSObjectRecordsInChild(String childRelationName, List<String> childFieldFullNames)
+  public List<SObject> getSObjectRecordsInChild(String childRelationName, List<String> childFieldFullNames)
 
 PARAMETERS
 
@@ -190,9 +176,7 @@ Gets the records of sObjectType.
 ```apex
 SIGNATURE
 
-
-
-public List<SObject> getSObjectRecords(SoqlQueryClause soqlQueryClause)
+  public List<SObject> getSObjectRecords(SoqlQueryClause soqlQueryClause)
 
 PARAMETERS
 
@@ -212,9 +196,7 @@ RETURN VALUE
 ```apex
 SIGNATURE
 
-
-
-public List<AggregateResult> countSObjectRecords(SoqlQueryClause soqlQueryClause)
+  public List<AggregateResult> countSObjectRecords(SoqlQueryClause soqlQueryClause)
 
 PARAMETERS
 
@@ -236,9 +218,7 @@ Counts the number of records of sObjectType
 ```apex
 SIGNATURE
 
-
-
-public List<AggregateResult> countSObjectRecords(String groupClause)
+  public List<AggregateResult> countSObjectRecords(String groupClause)
 
 PARAMETERS
 
@@ -258,9 +238,7 @@ RETURN VALUE
 ```apex
 SIGNATURE
 
-
-
-public String getSoqlQuery(SoqlQueryClause soqlQueryClause)
+  public String getSoqlQuery(SoqlQueryClause soqlQueryClause)
 
 PARAMETERS
 
@@ -282,9 +260,7 @@ Gets the records of sObjectType.
 ```apex
 SIGNATURE
 
-
-
-public InnerClass()
+  public InnerClass()
 
 
 
@@ -300,47 +276,7 @@ Gets the records of sObjectType.
 ```apex
 SIGNATURE
 
-
-
-public String innerMethod()
-
-
-
-RETURN VALUE
-
-  String
-```
-
-### InnerClass
-
-#### InnerClass
-
-Gets the records of sObjectType.
-
-```apex
-SIGNATURE
-
-
-
-public InnerClass()
-
-
-
-RETURN VALUE
-
-
-```
-
-#### innerMethod
-
-Gets the records of sObjectType.
-
-```apex
-SIGNATURE
-
-
-
-public String innerMethod()
+  public String innerMethod()
 
 
 
@@ -356,9 +292,7 @@ RETURN VALUE
 ```apex
 SIGNATURE
 
-
-
-public void invalidParamMethod(Integer "$#<><>)
+  public void invalidParamMethod(Integer "$#<><>)
 
 
 

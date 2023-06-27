@@ -192,7 +192,7 @@ public inherited sharing class DynamicDao {
 }
 ```
 
-The `apexdoc:generate` formats the above class to the following markdown and insert the markdown script into <usage> tag on the existing README.md:
+The `apexdoc:generate` formats the above class to the following markdown and insert the markdown script into `<usage>` tag on the existing README.md:
 
 ### DynamicDao
 

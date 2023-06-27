@@ -9,7 +9,7 @@
   "sectionDepth": {
     "class": 2
   },
-  "fileNameOfOutput": "README.md",
+  "outputExtension": ".md",
   "keyTag": "usage",
   "syntaxHighligherLang": "apex",
   "resolveJsonModule": true

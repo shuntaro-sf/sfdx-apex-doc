@@ -44,6 +44,16 @@ export type MethodInfo = {
   ReturnValue: string;
 };
 
+type StrIndex = {
+  str: string;
+  index: number;
+};
+
+type PoppedStr = {
+  popped: string[];
+  result: string;
+};
+
 export default class Generate extends SfCommand<ApexdocgenerateResult> {
   public static readonly summary = messages.getMessage("summary");
   public static readonly description = messages.getMessage("description");
@@ -60,11 +70,29 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
       summary: messages.getMessage("outputdir-flags.name.summary"),
       required: true,
     }),
+    docsdir: Flags.string({
+      char: "d",
+      summary: messages.getMessage("docsdir-flags.name.summary"),
+      required: false,
+      default: "docs",
+    }),
+    repourl: Flags.string({
+      char: "u",
+      summary: messages.getMessage("repourl-flags.name.summary"),
+      required: false,
+      default: "",
+    }),
+    releasever: Flags.string({
+      char: "v",
+      summary: messages.getMessage("releasever-flags.name.summary"),
+      required: false,
+      default: "",
+    }),
   };
 
   private static sectionLabel: { [key: string]: string } = ConfigData.sectionLabel;
   private static sectionDepth: { [key: string]: number } = ConfigData.sectionDepth;
-  private static fileNameOfOutput: string = ConfigData.fileNameOfOutput;
+  private static outputExtension: string = ConfigData.outputExtension;
   private static keyTag: string = ConfigData.keyTag;
   private static syntaxHighlighterLang: string = ConfigData.syntaxHighligherLang;
 
@@ -90,7 +118,11 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     };
   }
 
-  private collectClassInfos(flags: { inputdir: string; outputdir: string } & { [flag: string]: any } & { json: boolean | undefined }): void {
+  private collectClassInfos(
+    flags: { inputdir: string; outputdir: string; docsdir: string; repourl: string; releasever: string } & { [flag: string]: any } & {
+      json: boolean | undefined;
+    }
+  ): void {
     const files = readdirSync(flags.inputdir);
     for (const file of files) {
       if (extname(file) !== ".cls") {
@@ -103,7 +135,9 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
 
       const classInfo = { Name: "", Description: "", Classes: [] as ClassInfo[], Methods: [] as MethodInfo[] };
       this.collectEachClassInfo(apexClass, classInfo);
-      this.classInfos.push(classInfo);
+      if (classInfo.Name !== "") {
+        this.classInfos.push(classInfo);
+      }
     }
   }
 
@@ -142,15 +176,13 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
 
     apexClassSignatureMatch.shift();
     apexClassSplitBySignature.shift();
-    const innerApexClasses = this.getInnerApexClasses(apexClassSignatureMatch, apexClassSplitBySignature);
+    const innerApexClasses = this.popInnerApexClasses(apexClass, apexClassSignatureMatch, apexClassSplitBySignature);
 
-    let apexClassWithoutInnerClasses = apexClass.replace(apexClassSignatureMatch[0], "").replace(/}$/, "");
-    for (const innerClass of innerApexClasses) {
-      apexClassWithoutInnerClasses = apexClassWithoutInnerClasses.replace(innerClass, "");
-    }
+    const apexClassWithoutInnerClasses = innerApexClasses.result.replace(apexClassSignatureMatch[0], "").replace(/}$/, "");
+
     this.collectMethodInfos(apexClassWithoutInnerClasses, classInfo);
 
-    for (const innerApexClass of innerApexClasses) {
+    for (const innerApexClass of innerApexClasses.popped) {
       const eachInnerClassInfo = { Name: "", Description: "", Classes: [] as ClassInfo[], Methods: [] as MethodInfo[] };
       classInfo.Classes.push(eachInnerClassInfo);
       this.collectEachClassInfo(innerApexClass, eachInnerClassInfo);
@@ -201,54 +233,103 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     }
   }
 
-  private getInnerApexClasses(apexClassSignatureMatch: RegExpMatchArray, apexClassSplitBySignature: string[]): string[] {
+  private popInnerApexClasses(apexClass: string, apexClassSignatureMatch: RegExpMatchArray, apexClassSplitBySignature: string[]): PoppedStr {
+    const regExpOfClass = /\s*public\s+.*class\s*[A-Za-z]+\s*{/;
+    const apexClassSignatureSearch = apexClass.search(regExpOfClass);
+    apexClassSignatureMatch.shift();
+    apexClassSplitBySignature.shift();
+    let poppedApexClass = apexClass;
     const innerApexClasses = [];
-
     for (let idxOfInnerClassMatch = 0; idxOfInnerClassMatch < apexClassSignatureMatch.length; idxOfInnerClassMatch++) {
-      let classBeforeStr = "";
-      const strsBeforeClass = apexClassSplitBySignature[idxOfInnerClassMatch].split("");
-      for (let idxOfStr = strsBeforeClass.length - 1; idxOfStr >= 0; idxOfStr--) {
-        if (strsBeforeClass[idxOfStr] === "}") {
-          classBeforeStr = strsBeforeClass.slice(idxOfStr + 1, strsBeforeClass.length).join("");
-          break;
-        }
-      }
+      const docOfMethod = this.getDocOfMethod(apexClass, apexClassSplitBySignature, idxOfInnerClassMatch);
       const classSignature = apexClassSignatureMatch[idxOfInnerClassMatch];
-      let classAfterStr = "";
-      const strsAfterClass = apexClassSplitBySignature[idxOfInnerClassMatch + 1].split("");
-      let depthOfScope = 1;
-      for (let idxOfStr = 0; idxOfStr < strsAfterClass.length; idxOfStr++) {
-        if (strsAfterClass[idxOfStr] === "{") {
-          depthOfScope++;
-        } else if (strsAfterClass[idxOfStr] === "}") {
-          depthOfScope--;
-        }
-        if (depthOfScope === 0) {
-          classAfterStr = strsAfterClass.slice(0, idxOfStr + 1).join("");
-          break;
-        }
-      }
-      const innerApexClass = classBeforeStr + classSignature + classAfterStr;
+      const blockOfMethod = this.getBlockOfMethod(apexClass, apexClassSplitBySignature, idxOfInnerClassMatch);
+      const innerApexClass = docOfMethod.str + classSignature + blockOfMethod.str;
+
+      poppedApexClass =
+        apexClass.substring(0, apexClassSignatureSearch - docOfMethod.index) + apexClass.substring(blockOfMethod.index - docOfMethod.index);
       innerApexClasses.push(innerApexClass);
     }
-    return innerApexClasses;
+    return { popped: innerApexClasses, result: poppedApexClass };
   }
 
-  private updateReadme(flags: { inputdir: string; outputdir: string } & { [flag: string]: any } & { json: boolean | undefined }): void {
+  private getBlockOfMethod(apexClass: string, apexClassSplitBySignature: string[], idxOfInnerClassMatch: number): StrIndex {
+    const regExpOfClass = /\s*public\s+.*class\s*[A-Za-z]+\s*{/;
+    const apexClassSignatureSearch = apexClass.search(regExpOfClass);
+    let blockOfMethod = "";
+    let classEndIndex = 0;
+    const strsAfterClass = apexClassSplitBySignature[idxOfInnerClassMatch + 1].split("");
+    let depthOfScope = 1;
+    for (let idxOfStr = 0; idxOfStr < strsAfterClass.length; idxOfStr++) {
+      if (strsAfterClass[idxOfStr] === "{") {
+        depthOfScope++;
+      } else if (strsAfterClass[idxOfStr] === "}") {
+        depthOfScope--;
+      }
+      if (depthOfScope === 0) {
+        blockOfMethod = strsAfterClass.slice(0, idxOfStr + 1).join("");
+        classEndIndex = apexClassSignatureSearch + idxOfStr;
+        break;
+      }
+    }
+    return { str: blockOfMethod, index: classEndIndex };
+  }
+
+  private getDocOfMethod(apexClass: string, apexClassSplitBySignature: string[], idxOfInnerClassMatch: number): StrIndex {
+    const regExpOfClass = /\s*public\s+.*class\s*[A-Za-z]+\s*{/;
+    const apexClassSignatureSearch = apexClass.search(regExpOfClass);
+    let docOfMethod = "";
+    let classBeginIndex = 0;
+    const strsBeforeClass = apexClassSplitBySignature[idxOfInnerClassMatch].split("");
+    for (let idxOfStr = strsBeforeClass.length - 1; idxOfStr >= 0; idxOfStr--) {
+      if (strsBeforeClass[idxOfStr] === "}") {
+        docOfMethod = strsBeforeClass.slice(idxOfStr + 1, strsBeforeClass.length).join("");
+        classBeginIndex = apexClassSignatureSearch - idxOfStr;
+        break;
+      }
+    }
+    return { str: docOfMethod, index: classBeginIndex };
+  }
+
+  private updateReadme(
+    flags: { inputdir: string; outputdir: string; docsdir: string; repourl: string; releasever: string } & { [flag: string]: any } & {
+      json: boolean | undefined;
+    }
+  ): void {
     const linebreak = "\n";
     let classUsageStr = "";
+    let usageListStr = "";
     for (const classInfo of this.classInfos) {
-      classUsageStr += this.getClassInfoUsageStr(classInfo, Generate.sectionDepth.class);
+      const readmeText = "[README]";
+      const readmeUrl = "(" + join(flags.repourl, "blob", flags.releasever, "README" + Generate.outputExtension) + ")";
+      const classHierarchy = readmeText + readmeUrl + "/" + classInfo.Name;
+      classUsageStr += this.getClassInfoUsageStr(classInfo, Generate.sectionDepth.class, classHierarchy, flags);
+      usageListStr +=
+        "- [" + classInfo.Name + "](" + join(flags.repourl, "blob", flags.releasever, classInfo.Name + Generate.outputExtension) + ")" + linebreak;
+      writeFileSync(join(flags.outputdir, flags.docsdir, classInfo.Name + Generate.outputExtension), classUsageStr, "utf8");
     }
-    let readme = readFileSync(join(flags.outputdir, Generate.fileNameOfOutput), {
+    let readme = readFileSync(join(flags.outputdir, "README" + Generate.outputExtension), {
       encoding: "utf8",
     });
-    const regExpForUsage = /<usage>[\s\S]*<\/usage>/;
-    readme = readme.replace(regExpForUsage, "<" + Generate.keyTag + ">" + linebreak + classUsageStr + linebreak + "</" + Generate.keyTag + ">");
-    writeFileSync(join(flags.outputdir, Generate.fileNameOfOutput), readme, "utf8");
+
+    const regExpForUsage = new RegExp("<" + Generate.keyTag + ">[\\s\\S]*</" + Generate.keyTag + ">");
+    readme = readme.replace(regExpForUsage, "<" + Generate.keyTag + ">" + linebreak + usageListStr + "</" + Generate.keyTag + ">");
+    //    readme = readme.replace(regExpForUsage, "<" + Generate.keyTag + ">" + linebreak + classUsageStr + linebreak + "</" + Generate.keyTag + ">");
+
+    writeFileSync(join(flags.outputdir, "README" + Generate.outputExtension), readme, "utf8");
+    //   for (const classInfo of this.classInfos) {
+    ////     writeFileSync(join(flags.outputdir, classInfo.Name, Generate.outputExtension), readme, "utf8");
+    //   }
   }
 
-  private getClassInfoUsageStr(classInfo: ClassInfo, classSectionDepth: number): string {
+  private getClassInfoUsageStr(
+    classInfo: ClassInfo,
+    classSectionDepth: number,
+    classHierarchy: string,
+    flags: { inputdir: string; outputdir: string; docsdir: string; repourl: string; releasever: string } & { [flag: string]: any } & {
+      json: boolean | undefined;
+    }
+  ): string {
     const sectionChar = "#";
     const whiteSpace = " ";
     const linebreak = "\n";
@@ -256,40 +337,55 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     const classHeader = sectionChar.repeat(classSectionDepth) + whiteSpace + classInfo.Name;
     const classDescription = classInfo.Description;
 
-    const classUsageStrs = [classHeader, classDescription];
+    const classUsageStrs = [classHierarchy, classHeader, classDescription];
     for (const methodInfo of classInfo.Methods) {
-      const medhodHeader = sectionChar.repeat(classSectionDepth + 1) + whiteSpace + methodInfo.Name;
-      const methodDescription = methodInfo.Description;
-
-      const signatureList = [Generate.sectionLabel.signature, methodInfo.Signature];
-      const signatureSection = signatureList.join(linebreak.repeat(2) + linebreak.repeat(2));
-
-      let paramSection = "";
-      for (const param of methodInfo.Parameters) {
-        const paramDetailList = [Generate.sectionLabel.paramDescription + param.Description, Generate.sectionLabel.paramType + param.Type];
-        const paramDetailStr = whiteSpace.repeat(2) + paramDetailList.join(linebreak.repeat(2) + whiteSpace.repeat(4));
-        const paramList = [Generate.sectionLabel.parameters, param.Name, paramDetailStr];
-        paramSection += paramList.join(linebreak.repeat(2) + whiteSpace.repeat(2));
-      }
-
-      const returnList = [Generate.sectionLabel.returnValue, methodInfo.ReturnValue];
-      const returnSection = returnList.join(linebreak.repeat(2) + whiteSpace.repeat(2));
-
-      const codeBlockList = [signatureSection, paramSection, returnSection];
-      const codeBlock =
-        "```" + Generate.syntaxHighlighterLang + linebreak.repeat(1) + codeBlockList.join(linebreak.repeat(2)) + linebreak.repeat(1) + "```";
-
-      const classUsageList = [medhodHeader, methodDescription, codeBlock];
-      const classUsage = classUsageList.join(linebreak.repeat(2));
-      classUsageStrs.push(classUsage);
+      this.pushMethodUsageStr(classUsageStrs, methodInfo, classSectionDepth);
     }
     let classUsageStr = classUsageStrs.join(linebreak.repeat(2));
 
     if (classInfo.Classes.length !== 0) {
       for (const innerClassInfo of classInfo.Classes) {
-        classUsageStr += linebreak.repeat(2) + this.getClassInfoUsageStr(innerClassInfo, classSectionDepth + 1);
+        const text = "[" + classHierarchy + "]";
+        const url = "(" + join(flags.repourl, "blob", flags.releasever, classInfo.Name + Generate.outputExtension) + ")";
+        const innerClassHierarchy = text + url + "/" + innerClassInfo.Name;
+        classUsageStr += linebreak.repeat(2) + this.getClassInfoUsageStr(innerClassInfo, classSectionDepth + 1, innerClassHierarchy, flags);
       }
     }
     return classUsageStr + linebreak.repeat(2);
+  }
+
+  private pushMethodUsageStr(classUsageStrs: string[], methodInfo: MethodInfo, classSectionDepth: number): void {
+    const sectionChar = "#";
+    const whiteSpace = " ";
+    const linebreak = "\n";
+    const medhodHeader = sectionChar.repeat(classSectionDepth + 1) + whiteSpace + methodInfo.Name;
+    const methodDescription = methodInfo.Description;
+
+    const signatureList = [Generate.sectionLabel.signature, methodInfo.Signature];
+    const signatureSection = signatureList.join(linebreak.repeat(2) + whiteSpace.repeat(2));
+
+    const paramSection = this.getParamUsageStr(methodInfo, whiteSpace, linebreak);
+
+    const returnList = [Generate.sectionLabel.returnValue, methodInfo.ReturnValue];
+    const returnSection = returnList.join(linebreak.repeat(2) + whiteSpace.repeat(2));
+
+    const codeBlockList = [signatureSection, paramSection, returnSection];
+    const codeBlock =
+      "```" + Generate.syntaxHighlighterLang + linebreak.repeat(1) + codeBlockList.join(linebreak.repeat(2)) + linebreak.repeat(1) + "```";
+
+    const classUsageList = [medhodHeader, methodDescription, codeBlock];
+    const classUsage = classUsageList.join(linebreak.repeat(2));
+    classUsageStrs.push(classUsage);
+  }
+
+  private getParamUsageStr(methodInfo: MethodInfo, whiteSpace: string, linebreak: string): string {
+    let paramSection = "";
+    for (const param of methodInfo.Parameters) {
+      const paramDetailList = [Generate.sectionLabel.paramDescription + param.Description, Generate.sectionLabel.paramType + param.Type];
+      const paramDetailStr = whiteSpace.repeat(2) + paramDetailList.join(linebreak.repeat(2) + whiteSpace.repeat(4));
+      const paramList = [Generate.sectionLabel.parameters, param.Name, paramDetailStr];
+      paramSection += paramList.join(linebreak.repeat(2) + whiteSpace.repeat(2));
+    }
+    return paramSection;
   }
 }
