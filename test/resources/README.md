@@ -1,6 +1,6 @@
 <usage>
 
-- [DynamicDao](/blob//DynamicDao.md)
-- [NoneMethods](/blob//NoneMethods.md)
+- [DynamicDao](/blob//docs/DynamicDao.md)
+- [NoneMethods](/blob//docs/NoneMethods.md)
 
 </usage>

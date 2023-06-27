@@ -300,7 +300,7 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
       const readmeText = "[README]";
       const readmeUrlDirs = [flags.repourl, "blob", flags.releasever, "README" + Generate.outputExtension];
       const readmeUrl = "(" + readmeUrlDirs.join("/") + ")";
-      const classHierarchy = readmeText + readmeUrl + "/" + classInfo.Name;
+      const classHierarchy = readmeText + readmeUrl + "&frasl;" + classInfo.Name;
       classUsageStr += this.getClassInfoUsageStr(classInfo, Generate.sectionDepth.class, classHierarchy, flags);
       const urlDirs = [flags.repourl, "blob", flags.releasever, flags.docsdir, classInfo.Name + Generate.outputExtension];
       usageListStr += "- [" + classInfo.Name + "](" + urlDirs.join("/") + ")" + linebreak;
@@ -344,7 +344,7 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
       const text = "[" + classHierarchy + "]";
       const urlDirs = [flags.repourl, "blob", flags.releasever, classInfo.Name + Generate.outputExtension];
       const url = "(" + urlDirs.join("/") + ")";
-      const innerClassHierarchy = text + url + "/" + innerClassInfo.Name;
+      const innerClassHierarchy = text + url + "&frasl;" + innerClassInfo.Name;
       classUsageStr += linebreak.repeat(2) + this.getClassInfoUsageStr(innerClassInfo, classSectionDepth + 1, innerClassHierarchy, flags);
     }
     return classUsageStr + linebreak.repeat(2);
