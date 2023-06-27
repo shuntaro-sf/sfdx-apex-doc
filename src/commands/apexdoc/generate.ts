@@ -92,6 +92,7 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
 
   private static sectionLabel: { [key: string]: string } = ConfigData.sectionLabel;
   private static sectionDepth: { [key: string]: number } = ConfigData.sectionDepth;
+  private static slashChar: string = ConfigData.slashChar;
   private static outputExtension: string = ConfigData.outputExtension;
   private static keyTag: string = ConfigData.keyTag;
   private static syntaxHighlighterLang: string = ConfigData.syntaxHighligherLang;
@@ -294,17 +295,14 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     }
   ): void {
     const linebreak = "\n";
-    let classUsageStr = "";
+    // let classUsageStr = "";
     let usageListStr = "";
     for (const classInfo of this.classInfos) {
-      const readmeText = "[README]";
-      const readmeUrlDirs = [flags.repourl, "blob", flags.releasever, "README" + Generate.outputExtension];
-      const readmeUrl = "(" + readmeUrlDirs.join("/") + ")";
-      const classHierarchy = readmeText + readmeUrl + "&frasl;" + classInfo.Name;
-      classUsageStr += this.getClassInfoUsageStr(classInfo, Generate.sectionDepth.class, classHierarchy, flags);
+      const classesOfUrlDirs = [classInfo.Name];
+      this.getClassInfoUsageStr(classInfo, Generate.sectionDepth.class, classesOfUrlDirs, flags);
       const urlDirs = [flags.repourl, "blob", flags.releasever, flags.docsdir, classInfo.Name + Generate.outputExtension];
       usageListStr += "- [" + classInfo.Name + "](" + urlDirs.join("/") + ")" + linebreak;
-      writeFileSync(join(flags.outputdir, flags.docsdir, classInfo.Name + Generate.outputExtension), classUsageStr, "utf8");
+      // writeFileSync(join(flags.outputdir, flags.docsdir, classInfo.Name + Generate.outputExtension), classUsageStr, "utf8");
     }
     let readme = readFileSync(join(flags.outputdir, "README" + Generate.outputExtension), {
       encoding: "utf8",
@@ -322,11 +320,11 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
   private getClassInfoUsageStr(
     classInfo: ClassInfo,
     classSectionDepth: number,
-    classHierarchy: string,
+    classesOfUrlDirs: string[],
     flags: { inputdir: string; outputdir: string; docsdir: string; repourl: string; releasever: string } & { [flag: string]: any } & {
       json: boolean | undefined;
     }
-  ): string {
+  ): void {
     const sectionChar = "#";
     const whiteSpace = " ";
     const linebreak = "\n";
@@ -334,20 +332,50 @@ export default class Generate extends SfCommand<ApexdocgenerateResult> {
     const classHeader = sectionChar.repeat(classSectionDepth) + whiteSpace + classInfo.Name;
     const classDescription = classInfo.Description;
 
+    const classHierarchy = this.getUrlStr(classesOfUrlDirs, flags);
     const classUsageStrs = [classHierarchy, classHeader, classDescription];
     for (const methodInfo of classInfo.Methods) {
       this.pushMethodUsageStr(classUsageStrs, methodInfo, classSectionDepth);
     }
-    let classUsageStr = classUsageStrs.join(linebreak.repeat(2));
-
+    const classUsageStr = classUsageStrs.join(linebreak.repeat(2));
+    writeFileSync(join(flags.outputdir, flags.docsdir, classesOfUrlDirs.join(".") + Generate.outputExtension), classUsageStr, "utf8");
     for (const innerClassInfo of classInfo.Classes) {
-      const text = "[" + classHierarchy + "]";
-      const urlDirs = [flags.repourl, "blob", flags.releasever, classInfo.Name + Generate.outputExtension];
-      const url = "(" + urlDirs.join("/") + ")";
-      const innerClassHierarchy = text + url + "&frasl;" + innerClassInfo.Name;
-      classUsageStr += linebreak.repeat(2) + this.getClassInfoUsageStr(innerClassInfo, classSectionDepth + 1, innerClassHierarchy, flags);
+      const innerClassUrlDirs = Array.from(classesOfUrlDirs);
+      innerClassUrlDirs.push(innerClassInfo.Name);
+      this.getClassInfoUsageStr(innerClassInfo, classSectionDepth + 1, innerClassUrlDirs, flags);
     }
-    return classUsageStr + linebreak.repeat(2);
+  }
+
+  private getUrlStr(
+    classesOfUrlDirs: string[],
+    flags: { inputdir: string; outputdir: string; docsdir: string; repourl: string; releasever: string } & { [flag: string]: any } & {
+      json: boolean | undefined;
+    }
+  ): string {
+    let urlStr = "";
+    const whiteSpace = " ";
+    const readmeText = "[README]";
+    const readmeUrlDirs = [flags.repourl, "blob", flags.releasever, "README" + Generate.outputExtension];
+    const readmeUrl = "(" + readmeUrlDirs.join("/") + ")";
+    urlStr = readmeText + readmeUrl + whiteSpace + Generate.slashChar + whiteSpace;
+    for (let idxOfUrlDir = 0; idxOfUrlDir < classesOfUrlDirs.length; idxOfUrlDir++) {
+      if (idxOfUrlDir < classesOfUrlDirs.length - 1) {
+        const eachText = "[" + classesOfUrlDirs[idxOfUrlDir] + "]";
+        const eachUrlDirs = [
+          flags.repourl,
+          "blob",
+          flags.releasever,
+          flags.docsdir,
+          classesOfUrlDirs.slice(0, idxOfUrlDir + 1).join(".") + Generate.outputExtension,
+        ];
+        const eachUrl = "(" + eachUrlDirs.join("/") + ")";
+        const eachClassHierarchy = eachText + eachUrl;
+        urlStr += eachClassHierarchy + whiteSpace + Generate.slashChar + whiteSpace;
+      } else {
+        urlStr += classesOfUrlDirs[idxOfUrlDir];
+      }
+    }
+    return urlStr;
   }
 
   private pushMethodUsageStr(classUsageStrs: string[], methodInfo: MethodInfo, classSectionDepth: number): void {

@@ -9,6 +9,7 @@
   "sectionDepth": {
     "class": 2
   },
+  "slashChar": "&frasl;",
   "outputExtension": ".md",
   "keyTag": "usage",
   "syntaxHighligherLang": "apex",
