@@ -2,6 +2,7 @@
 
 [![NPM](https://img.shields.io/npm/v/@shuntaro/sfdx-apex-doc.svg?label=@shuntaro/sfdx-apex-doc)](https://www.npmjs.com/package/@shuntaro/sfdx-apex-doc) [![Downloads/week](https://img.shields.io/npm/dw/@shuntaro/sfdx-apex-doc.svg)](https://npmjs.org/package/@shuntaro/sfdx-apex-doc) [![License](https://img.shields.io/badge/License-BSD%203--Clause-brightgreen.svg)](https://raw.githubusercontent.com/salesforcecli/@shuntaro/sfdx-apex-doc/main/LICENSE.txt)
 
+<!--
 ## Using the template
 
 This repository provides a template for creating a plugin for the Salesforce CLI. To convert this template to a working plugin:
@@ -49,6 +50,8 @@ This plugin includes sample hooks in the [src/hooks directory](src/hooks). You'l
 This plugin is bundled with the [Salesforce CLI](https://developer.salesforce.com/tools/sfdxcli). For more information on the CLI, read the [getting started guide](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_intro.htm).
 
 We always recommend using the latest version of these commands bundled with the CLI, however, you can install a specific version or tag if needed.
+
+-->
 
 ## Install
 
@@ -145,6 +148,8 @@ EXAMPLES
 <!-- commandsstop -->
 
 # Example
+
+## apexdoc:generate
 
 The example of formatting the following apex class: DynamicDao.cls.
 
@@ -243,4 +248,102 @@ PARAMETERS
 RETURN VALUE
 
   List<SObject>
+```
+
+# apexflow:generate
+
+This command is in development not tested out at all! Thefore, we cannot ensure everything works fine.
+
+the command creates flow-diagram build with mermaid-stateDiagram-v2. An example of producing the following Apex classe's flow diagram:
+
+```apex
+public inherited sharing class NoneMethods {
+  public void method() {
+    System.debug('dd');
+    if (true) {
+      System.debug('if');
+    } else if (true) {
+      System.debug('elseif');
+    } else {
+      System.debug('else');
+    }
+    System.debug('ddd');
+    for (Integer idx = 0; idx < 10; idx++) {
+      System.debug('for');
+    }
+    Integer i = 0;
+    switch on i {
+      when 1 {
+        System.debug('1');
+        if (i < 2) {
+          System.debug('i is less than 2');
+        } else {
+          System.debug('i not is less than 2');
+        }
+      }
+      when 2 {
+        System.debug('2');
+      }
+    }
+  }
+}
+```
+
+The output diagram:
+
+```mermaid
+stateDiagram-v2
+[*] --> ex0
+state "
+    System.debug('dd');" as ex0
+ex0 --> if0
+state if0 <<choice>>
+state if0 <<choice>>
+if0 --> ex1 : true
+if0 --> if1 : else
+state "
+      System.debug('if');" as ex1
+ex1 --> ex4
+state if1 <<choice>>
+if1 --> ex2 : true
+if1 --> ex3 : else
+state "
+      System.debug('elseif');" as ex2
+ex2 --> ex4
+state "
+      System.debug('else');" as ex3
+ex3 --> ex4
+state "
+    System.debug('ddd');" as ex4
+ex4 --> for0
+state "Integer idx = 0; idx < 10; idx++" as for0
+for0 --> ex5
+for0 --> ex6
+state "
+      System.debug('for');" as ex5
+ex5 --> for0
+state "
+    Integer i = 0;" as ex6
+ex6 --> switch0
+state switch0 <<choice>>
+switch0 --> when0 : 1
+when0 --> ex7
+state "
+        System.debug('1');" as ex7
+ex7 --> if3
+state if3 <<choice>>
+state if3 <<choice>>
+if3 --> ex8 : i < 2
+if3 --> ex9 : else
+state "
+          System.debug('i is less than 2');" as ex8
+ex8 --> [*]
+state "
+          System.debug('i not is less than 2');" as ex9
+ex9 --> [*]
+switch0 --> when1 : 2
+when1 --> ex10
+state "
+        System.debug('2');" as ex10
+ex10 --> [*]
 ```

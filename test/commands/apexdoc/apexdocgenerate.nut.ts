@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/quotes */
 import { execCmd, TestSession } from "@salesforce/cli-plugins-testkit";
 import { expect } from "chai";
-import { ApexdocgenerateResult } from "../../../src/commands/apexdoc/generate";
+import { ApexdocgenerateResult } from "../../../src/commands/apexdoc/doc/generate";
 
 let testSession: TestSession;
 
@@ -15,7 +15,7 @@ describe("apexdoc generate NUTs", () => {
   });
 
   it("apexdoc generate", () => {
-    const result = execCmd<ApexdocgenerateResult>("apexdoc generate -i test/resources/classes -o test/resources  --json", {
+    const result = execCmd<ApexdocgenerateResult>("apexdoc doc generate -i test/resources/classes -o test/resources  --json", {
       ensureExitCode: 0,
     }).jsonOutput?.result;
     expect(result?.inputdir).to.equal("test/resources/classes");
@@ -35,10 +35,8 @@ describe("apexdoc generate NUTs", () => {
   });
 
   it("directory not found", () => {
-    const resultInput = execCmd<ApexdocgenerateResult>("apexdoc generate -i test/notfound -o test/resources", { ensureExitCode: 1 }).jsonOutput
-      ?.result;
-    const resultOutput = execCmd<ApexdocgenerateResult>("apexdoc generate -i test/resources/classes -o test/notfound", { ensureExitCode: 1 })
-      .jsonOutput?.result;
+    const resultInput = execCmd<ApexdocgenerateResult>("apexdoc doc generate -i test/notfound -o test/resources", { ensureExitCode: 1 }).jsonOutput?.result;
+    const resultOutput = execCmd<ApexdocgenerateResult>("apexdoc doc generate -i test/resources/classes -o test/notfound", { ensureExitCode: 1 }).jsonOutput?.result;
 
     expect(resultInput).to.equal(undefined);
     expect(resultOutput).to.equal(undefined);
