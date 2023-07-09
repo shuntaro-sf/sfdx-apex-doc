@@ -19,7 +19,7 @@ describe("apexdoc flowdiagram generate NUTs", () => {
       ensureExitCode: 0,
     }).jsonOutput?.result;
     expect(result?.inputdir).to.equal("test/resources/classes");
-    expect(result?.outputdir).to.equal("test/resources");
+    expect(result?.outputdir).to.equal("test/resources/flowdocs");
     expect(result?.classInfos[0].Name).to.equal("DynamicDao");
     expect(result?.classInfos[0].Methods[1].Name).to.equal("getSelfSObjectRecords");
     expect(result?.classInfos[0].Methods[1].Parameters[0].Name).to.equal("soqlQueryClause");
