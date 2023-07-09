@@ -114,15 +114,16 @@ sf plugins
 
 <!-- commands -->
 
-- [`sf apexdoc generate`](#sf-apexdoc-generate)
+- [`sf apexdoc doc generate`](#sf-apexdoc-doc-generate)
+- [`sf apexdoc flowdiagram generate`](#sf-apexdoc-flowdiagram-generate)
 
-## `sf apexdoc generate`
+## `sf apexdoc doc generate`
 
 Generates Apex doc to READ.md.
 
 ```
 USAGE
-  $ sf apexdoc generate -i <value> -o <value> [--json] [-d <value>] [-u <value>] [-v <value>]
+  $ sf apexdoc doc generate -i <value> -o <value> [--json] [-d <value>] [-u <value>] [-v <value>]
 
 FLAGS
   -d, --docsdir=<value>     [default: docs] directory that Apex documentation markdown files are saved in.
@@ -143,6 +144,32 @@ EXAMPLES
   Generates Apex doc to README.md:
 
     $ sfdx apexdoc:generate -i <inputdirecroy> -o <outputdirecroy>
+```
+
+## `sf apexdoc flowdiagram generate`
+
+Generates Apex doc to READ.md.
+
+```
+USAGE
+  $ sf apexdoc flowdiagram generate -i <value> -o <value> [--json]
+
+FLAGS
+  -i, --inputdir=<value>   (required) input directory that apex classes are stored in.
+  -o, --outputdir=<value>  (required) output directory that includes README.md.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Generates Apex doc to READ.md.
+
+  Generates Apex doc in the Apex Developer document format to READ.md.
+
+EXAMPLES
+  Generates Apex flow diagram built with mermaid statement-v:
+
+    $ sfdx apexdoc:flowdiagram:generate -i <inputdirecroy> -o <outputdirecroy>
 ```
 
 <!-- commandsstop -->
