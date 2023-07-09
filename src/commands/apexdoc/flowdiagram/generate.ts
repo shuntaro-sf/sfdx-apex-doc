@@ -17,7 +17,7 @@ const messages = Messages.loadMessages("@shuntaro/sfdx-apex-doc", "flowdiagram.g
 //@ts-ignore
 import * as ConfigData from "../../../../src_config/apexdoc-flowdiagram-generate.json";
 
-export type apexflowgenerateResult = {
+export type ApexdocflowgenerateResult = {
   classInfos: ClassInfo[];
   inputdir: string;
   outputdir: string;
@@ -103,7 +103,7 @@ type PoppedStr = {
   result: string;
 };
 
-export default class Generate extends SfCommand<apexflowgenerateResult> {
+export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
   public static readonly summary = messages.getMessage("summary");
   public static readonly description = messages.getMessage("description");
   public static readonly examples = messages.getMessages("examples");
@@ -126,7 +126,7 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
   private numberOfStatements = { ex: 0, if: 0, for: 0, while: 0, switch: 0, when: 0 };
   private flowStates = [] as string[];
 
-  public async run(): Promise<apexflowgenerateResult> {
+  public async run(): Promise<ApexdocflowgenerateResult> {
     const { flags } = await this.parse(Generate);
     if (!existsSync(flags.inputdir)) {
       throw new SfError(messages.getMessage("error.path.input") + flags.inputdir);
@@ -144,7 +144,6 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
         this.sortFlowStates();
         const flowDiagramStr = this.flowStates.join("\n");
         const mermaidStr = "```mermaid\nstateDiagram-v2\n" + flowDiagramStr + "\n```";
-        // eslint-disable-next-line no-console
         this.writeFlowDiagramFile(mermaidStr, classInfo.Name + method.Name + Generate.outputExtension, flags);
       }
     }
@@ -726,6 +725,10 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
       } else {
         statements[idxOfStatement].ReferencesTo.push(statements[idxOfStatement + 1].Id);
       }
+    }
+
+    if (statements.length < 1) {
+      return;
     }
 
     if (Object.keys(statements[statements.length - 1].If).length) {
