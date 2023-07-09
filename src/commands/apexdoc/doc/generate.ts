@@ -15,7 +15,7 @@ const messages = Messages.loadMessages("@shuntaro/sfdx-apex-doc", "apexdoc.gener
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 //@ts-ignore
-import * as ConfigData from "../../../../src_config/apexdoc-generate.json";
+import * as ConfigData from "../../../../src_config/apexdoc-doc-generate.json";
 
 export type ApexdocgenerateResult = {
   classInfos: ClassInfo[];

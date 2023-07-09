@@ -5,7 +5,7 @@ import { ApexdocgenerateResult } from "../../../src/commands/apexdoc/doc/generat
 
 let testSession: TestSession;
 
-describe("apexdoc generate NUTs", () => {
+describe("apexdoc doc generate NUTs", () => {
   before("prepare session", async () => {
     testSession = await TestSession.create();
   });
@@ -14,7 +14,7 @@ describe("apexdoc generate NUTs", () => {
     await testSession?.clean();
   });
 
-  it("apexdoc generate", () => {
+  it("apexdoc doc generate", () => {
     const result = execCmd<ApexdocgenerateResult>("apexdoc doc generate -i test/resources/classes -o test/resources  --json", {
       ensureExitCode: 0,
     }).jsonOutput?.result;

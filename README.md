@@ -114,15 +114,16 @@ sf plugins
 
 <!-- commands -->
 
-- [`sf apexdoc generate`](#sf-apexdoc-generate)
+- [`sf apexdoc doc generate`](#sf-apexdoc-doc-generate)
+- [`sf apexdoc flowdiagram generate`](#sf-apexdoc-flowdiagram-generate)
 
-## `sf apexdoc generate`
+## `sf apexdoc doc generate`
 
 Generates Apex doc to READ.md.
 
 ```
 USAGE
-  $ sf apexdoc generate -i <value> -o <value> [--json] [-d <value>] [-u <value>] [-v <value>]
+  $ sf apexdoc doc generate -i <value> -o <value> [--json] [-d <value>] [-u <value>] [-v <value>]
 
 FLAGS
   -d, --docsdir=<value>     [default: docs] directory that Apex documentation markdown files are saved in.
@@ -143,6 +144,32 @@ EXAMPLES
   Generates Apex doc to README.md:
 
     $ sfdx apexdoc:generate -i <inputdirecroy> -o <outputdirecroy>
+```
+
+## `sf apexdoc flowdiagram generate`
+
+Generates Apex doc to READ.md.
+
+```
+USAGE
+  $ sf apexdoc flowdiagram generate -i <value> -o <value> [--json]
+
+FLAGS
+  -i, --inputdir=<value>   (required) input directory that apex classes are stored in.
+  -o, --outputdir=<value>  (required) output directory that includes README.md.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Generates Apex doc to READ.md.
+
+  Generates Apex doc in the Apex Developer document format to READ.md.
+
+EXAMPLES
+  Generates Apex flow diagram built with mermaid statement-v:
+
+    $ sfdx apexdoc:flowdiagram:generate -i <inputdirecroy> -o <outputdirecroy>
 ```
 
 <!-- commandsstop -->
@@ -250,11 +277,11 @@ RETURN VALUE
   List<SObject>
 ```
 
-# apexflow:generate
+# flowdiagram:generate
 
 This command is in development not tested out at all! Thefore, we cannot ensure everything works fine.
 
-the command creates flow-diagram build with mermaid-stateDiagram-v2. An example of producing the following Apex classe's flow diagram:
+the command creates flow-diagram built with mermaid-stateDiagram-v2. An example of producing the following Apex classe's flow diagram:
 
 ```apex
 public inherited sharing class NoneMethods {
@@ -285,65 +312,84 @@ public inherited sharing class NoneMethods {
         System.debug('2');
       }
     }
+    while (i < 10) {
+      System.debug(i);
+      i++;
+    }
   }
 }
+
 ```
 
 The output diagram:
 
 ```mermaid
 stateDiagram-v2
-[*] --> ex0
 state "
     System.debug('dd');" as ex0
-ex0 --> if0
 state if0 <<choice>>
-state if0 <<choice>>
-if0 --> ex1 : true
-if0 --> if1 : else
 state "
       System.debug('if');" as ex1
-ex1 --> ex4
 state if1 <<choice>>
-if1 --> ex2 : true
-if1 --> ex3 : else
 state "
       System.debug('elseif');" as ex2
-ex2 --> ex4
 state "
       System.debug('else');" as ex3
-ex3 --> ex4
 state "
     System.debug('ddd');" as ex4
-ex4 --> for0
-state "Integer idx = 0; idx < 10; idx++" as for0
-for0 --> ex5
-for0 --> ex6
+state "For loop
+Integer idx = 0" as for0
+state if3 <<choice>>
 state "
       System.debug('for');" as ex5
-ex5 --> for0
+state " idx++" as ex6
 state "
-    Integer i = 0;" as ex6
-ex6 --> switch0
+    Integer i = 0;" as ex7
 state switch0 <<choice>>
+state "
+        System.debug('1');" as ex8
+state if5 <<choice>>
+state "
+          System.debug('i is less than 2');" as ex9
+state "
+          System.debug('i not is less than 2');" as ex10
+state "
+        System.debug('2');" as ex11
+state "while loop" as while0
+state if7 <<choice>>
+state "
+      System.debug(i);" as ex12
+state "
+      i++;" as ex13
+[*] --> ex0
+ex0 --> if0
+if0 --> ex1 : true
+if0 --> if1 : else
+ex1 --> ex4
+if1 --> ex2 : true
+if1 --> ex3 : else
+ex2 --> ex4
+ex3 --> ex4
+ex4 --> for0
+for0 --> if3
+if3 --> ex5 :  idx < 10
+if3 --> ex7 : else
+ex5 --> ex6
+ex6 --> if3
+ex7 --> switch0
 switch0 --> when0 : 1
-when0 --> ex7
-state "
-        System.debug('1');" as ex7
-ex7 --> if3
-state if3 <<choice>>
-state if3 <<choice>>
-if3 --> ex8 : i < 2
-if3 --> ex9 : else
-state "
-          System.debug('i is less than 2');" as ex8
-ex8 --> [*]
-state "
-          System.debug('i not is less than 2');" as ex9
-ex9 --> [*]
+when0 --> ex8
+ex8 --> if5
+if5 --> ex9 : i < 2
+if5 --> ex10 : else
+ex9 --> while0
+ex10 --> while0
 switch0 --> when1 : 2
-when1 --> ex10
-state "
-        System.debug('2');" as ex10
-ex10 --> [*]
+when1 --> ex11
+ex11 --> while0
+while0 --> if7
+if7 --> ex12 : i < 10
+if7 --> [*] : else
+ex12 --> ex13
+ex13 --> if7
 ```
