@@ -5,17 +5,17 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/quotes */
-import { readFileSync, readdirSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync } from "fs";
 import { join, extname } from "path";
 import { SfCommand, Flags } from "@salesforce/sf-plugins-core";
 import { Messages, SfError } from "@salesforce/core";
 
 Messages.importMessagesDirectory(__dirname);
-const messages = Messages.loadMessages("@shuntaro/sfdx-apex-doc", "apexflow.generate");
+const messages = Messages.loadMessages("@shuntaro/sfdx-apex-doc", "flowdiagram.generate");
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 //@ts-ignore
-//import * as ConfigData from "../../../../src_config/apexflow-generate.json";
+import * as ConfigData from "../../../../src_config/apexdoc-flowdiagram-generate.json";
 
 export type apexflowgenerateResult = {
   classInfos: ClassInfo[];
@@ -46,6 +46,7 @@ export type Statement = {
   Label: string;
   If: IfStatement;
   For: ForStatement;
+  While: WhileStatement;
   Switch: SwitchStatement;
   ReferencesTo: string[];
 };
@@ -61,8 +62,9 @@ export type IfStatement = {
 
 export type ForStatement = {
   Id: string;
+  If: IfStatement;
   Statements: Statement[];
-  Condition: string;
+  Expression: string;
   ReferencesTo: string[];
   EndIndex: number;
 };
@@ -79,6 +81,14 @@ export type WhenStatement = {
   Id: string;
   Condition: string;
   Statements: Statement[];
+  ReferencesTo: string[];
+  EndIndex: number;
+};
+
+export type WhileStatement = {
+  Id: string;
+  If: IfStatement;
+  Condition: string;
   ReferencesTo: string[];
   EndIndex: number;
 };
@@ -109,16 +119,12 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
       summary: messages.getMessage("outputdir-flags.name.summary"),
       required: true,
     }),
-    docsdir: Flags.string({
-      char: "d",
-      summary: messages.getMessage("docsdir-flags.name.summary"),
-      required: false,
-      default: "docs",
-    }),
   };
 
+  private static outputExtension: string = ConfigData.outputExtension;
   private classInfos: ClassInfo[] = [] as ClassInfo[];
-  private numberOfStatements = { ex: 0, if: 0, for: 0, switch: 0, when: 0 };
+  private numberOfStatements = { ex: 0, if: 0, for: 0, while: 0, switch: 0, when: 0 };
+  private flowStates = [] as string[];
 
   public async run(): Promise<apexflowgenerateResult> {
     const { flags } = await this.parse(Generate);
@@ -134,14 +140,12 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
       for (const method of classInfo.Methods) {
         const statements = this.collectStatements(method.Block);
         this.setReferencesTo(statements, "[*]");
-        let diagramStr = "[*] --> " + statements[0].Id + "\n";
-
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        diagramStr += this.getDiagramStr2(statements);
-        //   const diagramStr = this.getDiagramStr(statements, ["[*]"]);
-        //   console.log("```mermaid\nstateDiagram-v2\n" + diagramStr + "```");
+        this.pushDiagramStr(statements, true);
+        this.sortFlowStates();
+        const flowDiagramStr = this.flowStates.join("\n");
+        const mermaidStr = "```mermaid\nstateDiagram-v2\n" + flowDiagramStr + "\n```";
         // eslint-disable-next-line no-console
-        console.log(diagramStr);
+        this.writeFlowDiagramFile(mermaidStr, classInfo.Name + method.Name + Generate.outputExtension, flags);
       }
     }
 
@@ -152,18 +156,34 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
     };
   }
 
+  private writeFlowDiagramFile(
+    diagramStr: string,
+    fileName: string,
+    flags: { inputdir: string; outputdir: string } & { [flag: string]: any } & { json: boolean | undefined }
+  ): void {
+    writeFileSync(join(flags.outputdir, fileName), diagramStr, "utf-8");
+  }
+
   private collectStatements(methodBlock: string): Statement[] {
     const statements = [] as Statement[];
     let startIndex = 0;
     for (let idxOfBlockStr = 0; idxOfBlockStr < methodBlock.length; idxOfBlockStr++) {
-      const statement = { Id: "", Label: "", If: {} as IfStatement, For: {} as ForStatement, Switch: {} as SwitchStatement, ReferencesTo: [] as string[] };
+      const statement = {
+        Id: "",
+        Label: "",
+        If: {} as IfStatement,
+        For: {} as ForStatement,
+        While: {} as WhileStatement,
+        Switch: {} as SwitchStatement,
+        ReferencesTo: [] as string[],
+      };
       let isInSingleQuote = false;
       if (methodBlock[idxOfBlockStr] === ";" && !isInSingleQuote) {
         statement.Id = "ex" + String(this.numberOfStatements.ex);
         statement.Label = methodBlock.slice(startIndex, idxOfBlockStr + 1);
         statements.push(statement);
         this.numberOfStatements.ex++;
-        startIndex = idxOfBlockStr;
+        startIndex = idxOfBlockStr + 1;
       } else if (methodBlock[idxOfBlockStr] === "'" && methodBlock[idxOfBlockStr - 1] !== "/") {
         isInSingleQuote = !isInSingleQuote;
       }
@@ -200,6 +220,18 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
           statement.Id = switchStatement.Id;
           statements.push(statement);
           idxOfBlockStr += switchStatement.EndIndex;
+          startIndex = idxOfBlockStr;
+        }
+      }
+      if (methodBlock[idxOfBlockStr] === "w" && !isInSingleQuote) {
+        const regEpxOfOperator = /^while[\s\n]*\(/;
+        const blockAfterIf = methodBlock.slice(idxOfBlockStr, methodBlock.length);
+        if (blockAfterIf.match(regEpxOfOperator) !== null) {
+          const whileStatement = this.getWhileStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0);
+          statement.While = whileStatement;
+          statement.Id = whileStatement.Id;
+          statements.push(statement);
+          idxOfBlockStr += whileStatement.EndIndex;
           startIndex = idxOfBlockStr;
         }
       }
@@ -275,7 +307,7 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
   }
 
   private getForStatementBlock(blockStrs: string, idxOfBlockStr: number): ForStatement {
-    const forStatement = { Id: "", Statements: [] as Statement[], Condition: "", ReferencesTo: [] as string[], EndIndex: idxOfBlockStr };
+    const forStatement = { Id: "", If: {} as IfStatement, Statements: [] as Statement[], Expression: "", ReferencesTo: [] as string[], EndIndex: idxOfBlockStr };
     forStatement.Id = "for" + String(this.numberOfStatements.for);
     this.numberOfStatements.for++;
     let depthOfBlock = 0;
@@ -284,8 +316,19 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
     for (let idxOfBlockStrAfterIdx = 0; idxOfBlockStrAfterIdx < blockStrs.length; idxOfBlockStrAfterIdx++) {
       if (depthOfBlock === 0 && isInForStatement) {
         const regEpxOfOperator = /^[\s\n]*for\s*\(/;
-        forStatement.Condition = this.getParenthesis(blockStrs.replace(regEpxOfOperator, ""));
-        forStatement.Statements = this.getStatementsInFor(blockStrs, idxOfBlockStrAfterIdx);
+        const ifStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
+        const elseStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
+        ifStatement.Id = "if" + String(this.numberOfStatements.if);
+        this.numberOfStatements.if++;
+        elseStatement.Id = "if" + String(this.numberOfStatements.if);
+        this.numberOfStatements.if++;
+        ifStatement.Statements = this.getStatementsInFor(blockStrs, idxOfBlockStrAfterIdx);
+        ifStatement.Condition = this.getConditionOfFor(blockStrs.replace(regEpxOfOperator, ""));
+        ifStatement.Else = elseStatement;
+        const statementOfFor = this.getStatementOfFor(blockStrs);
+        ifStatement.Statements.push(statementOfFor);
+        forStatement.If = ifStatement;
+        forStatement.Expression = this.getInitStatementOfFor(blockStrs);
         forStatement.EndIndex = idxOfBlockStr + idxOfBlockStrAfterIdx;
         break;
       }
@@ -305,6 +348,96 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
   private getStatementsInFor(blockStrs: string, idxOfBlockStrAfterIdx: number): Statement[] {
     let statements = [];
     statements = this.collectStatements(blockStrs.slice(0, idxOfBlockStrAfterIdx - 1).replace(/^[\s\n]*for[\s\n]\(.*\)[\s\n]*{/, ""));
+    return statements;
+  }
+
+  private getConditionOfFor(blockStrs: string): string {
+    let condition = "";
+    const forConditionInParenthesis = this.getParenthesis(blockStrs.replace(/^[\s\n]*for[\s\n]*\(/, ""));
+    if (forConditionInParenthesis.includes(";")) {
+      const statementsInparenthesis = forConditionInParenthesis.split(";");
+      condition = statementsInparenthesis[1];
+    } else {
+      condition = "collection";
+    }
+    return condition;
+  }
+
+  private getStatementOfFor(blockStrs: string): Statement {
+    const statement = {
+      Id: "",
+      Label: "",
+      If: {} as IfStatement,
+      For: {} as ForStatement,
+      While: {} as WhileStatement,
+      Switch: {} as SwitchStatement,
+      ReferencesTo: [] as string[],
+    };
+    statement.Id = "ex" + String(this.numberOfStatements.ex);
+    this.numberOfStatements.ex++;
+    const forConditionInParenthesis = this.getParenthesis(blockStrs.replace(/^[\s\n]*for[\s\n]*\(/, ""));
+    if (forConditionInParenthesis.includes(";")) {
+      const statementsInparenthesis = forConditionInParenthesis.split(";");
+      statement.Label = statementsInparenthesis[2];
+    } else {
+      const foreachConditionSplittedBySpace = forConditionInParenthesis.split(":")[0].trim().split(" ");
+      const foreachElem = foreachConditionSplittedBySpace[foreachConditionSplittedBySpace.length - 1];
+      statement.Label = "next " + foreachElem;
+    }
+    return statement;
+  }
+
+  private getInitStatementOfFor(blockStrs: string): string {
+    let initStatement = "";
+    const forConditionInParenthesis = this.getParenthesis(blockStrs.replace(/^[\s\n]*for[\s\n]*\(/, ""));
+    if (forConditionInParenthesis.includes(";")) {
+      const statementsInparenthesis = forConditionInParenthesis.split(";");
+      initStatement = statementsInparenthesis[0];
+    } else {
+      initStatement = forConditionInParenthesis;
+    }
+    return initStatement;
+  }
+
+  private getWhileStatementBlock(blockStrs: string, idxOfBlockStr: number): WhileStatement {
+    const whileStatement = { Id: "", If: {} as IfStatement, Condition: "", ReferencesTo: [] as string[], EndIndex: idxOfBlockStr };
+    whileStatement.Id = "while" + String(this.numberOfStatements.while);
+    this.numberOfStatements.while++;
+    let depthOfBlock = 0;
+    let isInWhileStatement = false;
+    let isInSingleQuote = false;
+    for (let idxOfBlockStrAfterIdx = 0; idxOfBlockStrAfterIdx < blockStrs.length; idxOfBlockStrAfterIdx++) {
+      if (depthOfBlock === 0 && isInWhileStatement) {
+        const regEpxOfOperator = /^[\s\n]*while\s*\(/;
+        const ifStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
+        const elseStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
+        ifStatement.Id = "if" + String(this.numberOfStatements.if);
+        this.numberOfStatements.if++;
+        elseStatement.Id = "if" + String(this.numberOfStatements.if);
+        this.numberOfStatements.if++;
+        ifStatement.Statements = this.getStatementsInWhile(blockStrs, idxOfBlockStrAfterIdx);
+        ifStatement.Condition = this.getParenthesis(blockStrs.replace(regEpxOfOperator, ""));
+        ifStatement.Else = elseStatement;
+        whileStatement.If = ifStatement;
+        whileStatement.EndIndex = idxOfBlockStr + idxOfBlockStrAfterIdx;
+        break;
+      }
+      if (blockStrs[idxOfBlockStrAfterIdx] === "'" && blockStrs[idxOfBlockStrAfterIdx - 1] !== "/") {
+        isInSingleQuote = !isInSingleQuote;
+      }
+      if (blockStrs[idxOfBlockStrAfterIdx] === "{" && !isInSingleQuote) {
+        isInWhileStatement = true;
+        depthOfBlock++;
+      } else if (blockStrs[idxOfBlockStrAfterIdx] === "}" && !isInSingleQuote) {
+        depthOfBlock--;
+      }
+    }
+    return whileStatement;
+  }
+
+  private getStatementsInWhile(blockStrs: string, idxOfBlockStrAfterIdx: number): Statement[] {
+    let statements = [];
+    statements = this.collectStatements(blockStrs.slice(0, idxOfBlockStrAfterIdx - 1).replace(/^[\s\n]*while[\s\n]\(.*\)[\s\n]*{/, ""));
     return statements;
   }
 
@@ -420,7 +553,6 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
       } else if (blockStr[idxOfBlockStr] === ")" && !isInSingleQuote) {
         depthOfParenthesis--;
       }
-      //  console.log(blockStr[idxOfBlockStr]);
       if (depthOfParenthesis === 0) {
         return blockStr.slice(0, idxOfBlockStr);
       }
@@ -429,7 +561,7 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
   }
 
   private collectClassInfos(
-    flags: { inputdir: string; outputdir: string; docsdir: string } & { [flag: string]: any } & {
+    flags: { inputdir: string; outputdir: string } & { [flag: string]: any } & {
       json: boolean | undefined;
     }
   ): void {
@@ -587,6 +719,8 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
         this.setIfReferenecesTo(statements[idxOfStatement].If, statements[idxOfStatement + 1].Id);
       } else if (Object.keys(statements[idxOfStatement].For).length) {
         this.setForReferenecesTo(statements[idxOfStatement].For, statements[idxOfStatement + 1].Id);
+      } else if (Object.keys(statements[idxOfStatement].While).length) {
+        this.setWhileReferenecesTo(statements[idxOfStatement].While, statements[idxOfStatement + 1].Id);
       } else if (Object.keys(statements[idxOfStatement].Switch).length) {
         this.setSwitchReferenecesTo(statements[idxOfStatement].Switch, statements[idxOfStatement + 1].Id);
       } else {
@@ -598,6 +732,8 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
       this.setIfReferenecesTo(statements[statements.length - 1].If, endStatement);
     } else if (Object.keys(statements[statements.length - 1].For).length) {
       this.setForReferenecesTo(statements[statements.length - 1].For, endStatement);
+    } else if (Object.keys(statements[statements.length - 1].While).length) {
+      this.setWhileReferenecesTo(statements[statements.length - 1].While, endStatement);
     } else if (Object.keys(statements[statements.length - 1].Switch).length) {
       this.setSwitchReferenecesTo(statements[statements.length - 1].Switch, endStatement);
     } else {
@@ -613,10 +749,8 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
       ifStatement.ReferencesTo.push(endStatement);
     }
     if (!Object.keys(ifStatement.Else).length) {
-      // this.setReferencesTo(ifStatement.Statements, endStatement);
       return;
     }
-
     if (!Object.keys(ifStatement.Else.Else).length) {
       if (ifStatement.Else.Statements.length > 0) {
         ifStatement.ReferencesTo.push(ifStatement.Else.Statements[0].Id);
@@ -630,13 +764,23 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
   }
 
   private setForReferenecesTo(forStatement: ForStatement, endStatement: string): void {
-    if (forStatement.Statements.length > 0) {
-      forStatement.ReferencesTo.push(forStatement.Statements[0].Id);
-      this.setReferencesTo(forStatement.Statements, forStatement.Id);
+    forStatement.ReferencesTo.push(forStatement.If.Id);
+    this.setIfReferenecesTo(forStatement.If, endStatement);
+    if (forStatement.If.Statements.length > 0) {
+      forStatement.If.Statements[forStatement.If.Statements.length - 1].ReferencesTo = [forStatement.If.Id];
     } else {
-      forStatement.ReferencesTo.push(forStatement.Id);
+      forStatement.If.ReferencesTo.push(forStatement.If.Id);
     }
-    forStatement.ReferencesTo.push(endStatement);
+  }
+
+  private setWhileReferenecesTo(whileStatement: WhileStatement, endStatement: string): void {
+    whileStatement.ReferencesTo.push(whileStatement.If.Id);
+    this.setIfReferenecesTo(whileStatement.If, endStatement);
+    if (whileStatement.If.Statements.length > 0) {
+      whileStatement.If.Statements[whileStatement.If.Statements.length - 1].ReferencesTo = [whileStatement.If.Id];
+    } else {
+      whileStatement.If.ReferencesTo.push(whileStatement.If.Id);
+    }
   }
 
   private setSwitchReferenecesTo(switchStatement: SwitchStatement, endStatement: string): void {
@@ -652,65 +796,81 @@ export default class Generate extends SfCommand<apexflowgenerateResult> {
     }
   }
 
-  private getDiagramStr2(statements: Statement[]): string {
-    let str = "";
+  private pushDiagramStr(statements: Statement[], isFirstRecursion: boolean): void {
+    if (isFirstRecursion) {
+      if (statements.length > 0) {
+        this.flowStates.push("[*] --> " + statements[0].Id);
+      } else {
+        this.flowStates.push("[*] --> [*]");
+      }
+    }
+
     for (const statement of statements) {
       if (statement.Id.includes("ex")) {
-        str += "state " + '"' + statement.Label + '"' + " as " + statement.Id + "\n";
-      } else if (statement.Id.includes("if")) {
-        str += "state " + statement.If.Id + " <<choice>>\n";
+        this.flowStates.push("state " + '"' + statement.Label + '"' + " as " + statement.Id);
       } else if (statement.Id.includes("switch")) {
-        str += "state " + statement.Switch.Id + " <<choice>>\n";
+        this.flowStates.push("state " + statement.Switch.Id + " <<choice>>");
       }
 
       for (const referenceTo of statement.ReferencesTo) {
-        str += statement.Id + " --> " + referenceTo + "\n";
+        this.flowStates.push(statement.Id + " --> " + referenceTo);
       }
       if (Object.keys(statement.If).length) {
-        str += this.getIfDiagramStr2(statement.If);
+        this.pushIfDiagramStr(statement.If);
       }
       if (Object.keys(statement.For).length) {
-        str += this.getForDiagramStr2(statement.For);
+        this.pushForDiagramStr(statement.For);
+      }
+      if (Object.keys(statement.While).length) {
+        this.pushWhileDiagramStr(statement.While);
       }
       if (Object.keys(statement.Switch).length) {
-        str += this.getSwitchDiagramStr2(statement.Switch);
+        this.pushSwitchDiagramStr(statement.Switch);
       }
     }
-    return str;
   }
 
-  private getIfDiagramStr2(ifStatement: IfStatement): string {
-    let str = "";
+  private pushIfDiagramStr(ifStatement: IfStatement): void {
     if (Object.keys(ifStatement.Else).length) {
-      str = "state " + ifStatement.Id + " <<choice>>\n";
-      str += ifStatement.Id + " --> " + ifStatement.ReferencesTo[0] + " : " + ifStatement.Condition + "\n";
-      str += ifStatement.Id + " --> " + ifStatement.ReferencesTo[1] + " : else\n";
-      str += this.getDiagramStr2(ifStatement.Statements);
+      this.flowStates.push("state " + ifStatement.Id + " <<choice>>");
+      this.flowStates.push(ifStatement.Id + " --> " + ifStatement.ReferencesTo[0] + " : " + ifStatement.Condition);
+      this.flowStates.push(ifStatement.Id + " --> " + ifStatement.ReferencesTo[1] + " : else");
+      this.pushDiagramStr(ifStatement.Statements, false);
     }
     if (!Object.keys(ifStatement.Else).length) {
-      str += this.getDiagramStr2(ifStatement.Statements);
-      return str;
+      this.pushDiagramStr(ifStatement.Statements, false);
+      return;
     }
-    return str + this.getIfDiagramStr2(ifStatement.Else);
+    this.pushIfDiagramStr(ifStatement.Else);
   }
 
-  private getForDiagramStr2(forStatement: ForStatement): string {
-    let str = "";
-    str += "state " + '"' + forStatement.Condition + '"' + " as " + forStatement.Id + "\n";
+  private pushForDiagramStr(forStatement: ForStatement): void {
+    this.flowStates.push("state " + '"For loop\n' + forStatement.Expression + '"' + " as " + forStatement.Id);
     for (const referenceTo of forStatement.ReferencesTo) {
-      str += forStatement.Id + " --> " + referenceTo + "\n";
+      this.flowStates.push(forStatement.Id + " --> " + referenceTo);
     }
-    str += this.getDiagramStr2(forStatement.Statements);
-    return str;
+    this.pushIfDiagramStr(forStatement.If);
   }
 
-  private getSwitchDiagramStr2(switchStatement: SwitchStatement): string {
-    let str = "";
-    for (let idxOfReference = 0; idxOfReference < switchStatement.ReferencesTo.length; idxOfReference++) {
-      str += switchStatement.Id + " --> " + switchStatement.ReferencesTo[idxOfReference] + " : " + switchStatement.When[idxOfReference].Condition + "\n";
-      str += switchStatement.When[idxOfReference].Id + " --> " + switchStatement.When[idxOfReference].ReferencesTo[0] + "\n";
-      str += this.getDiagramStr2(switchStatement.When[idxOfReference].Statements);
+  private pushWhileDiagramStr(whileStatement: WhileStatement): void {
+    this.flowStates.push('state "while loop" as ' + whileStatement.Id);
+    for (const referenceTo of whileStatement.ReferencesTo) {
+      this.flowStates.push(whileStatement.Id + " --> " + referenceTo);
     }
-    return str;
+    this.pushIfDiagramStr(whileStatement.If);
+  }
+
+  private pushSwitchDiagramStr(switchStatement: SwitchStatement): void {
+    for (let idxOfReference = 0; idxOfReference < switchStatement.ReferencesTo.length; idxOfReference++) {
+      this.flowStates.push(switchStatement.Id + " --> " + switchStatement.ReferencesTo[idxOfReference] + " : " + switchStatement.When[idxOfReference].Condition);
+      this.flowStates.push(switchStatement.When[idxOfReference].Id + " --> " + switchStatement.When[idxOfReference].ReferencesTo[0]);
+      this.pushDiagramStr(switchStatement.When[idxOfReference].Statements, false);
+    }
+  }
+
+  private sortFlowStates(): void {
+    const states = this.flowStates.filter((e) => e.startsWith("state"));
+    const flows = this.flowStates.filter((e) => !e.startsWith("state"));
+    this.flowStates = states.concat(flows);
   }
 }

@@ -1,3 +1,0 @@
-Error: command apexdoc:generate not found
-    at Config.runCommand (C:\sfdxPlugin\@shuntaro\sfdx-apex-doc\node_modules\@oclif\core\lib\config\config.js:299:19)
-    at async Object.run (C:\sfdxPlugin\@shuntaro\sfdx-apex-doc\node_modules\@oclif\core\lib\main.js:89:16)

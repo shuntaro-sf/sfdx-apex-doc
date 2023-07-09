@@ -20,9 +20,9 @@ directory that Apex documentation markdown files are saved in.
 
 # examples
 
-- Generates Apex doc to README.md:
+- Generates Apex flow diagram built with mermaid statement-v:
 
-  sfdx apexflow:generate -i <inputdirecroy> -o <outputdirecroy>
+  sfdx apexdoc:flowdiagram:generate -i <inputdirecroy> -o <outputdirecroy>
 
 # error.path.input
 
