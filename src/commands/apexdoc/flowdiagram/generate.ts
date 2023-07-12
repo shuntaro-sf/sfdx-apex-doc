@@ -47,6 +47,7 @@ export type Statement = {
   If: IfStatement;
   For: ForStatement;
   While: WhileStatement;
+  DoWhile: DoWhileStatement;
   Switch: SwitchStatement;
   ReferencesTo: string[];
 };
@@ -93,6 +94,15 @@ export type WhileStatement = {
   EndIndex: number;
 };
 
+export type DoWhileStatement = {
+  Id: string;
+  Statements: Statement[];
+  If: IfStatement;
+  Condition: string;
+  ReferencesTo: string[];
+  EndIndex: number;
+};
+
 type StrIndex = {
   str: string;
   index: number;
@@ -123,7 +133,7 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
 
   private static outputExtension: string = ConfigData.outputExtension;
   private classInfos: ClassInfo[] = [] as ClassInfo[];
-  private numberOfStatements = { ex: 0, if: 0, for: 0, while: 0, switch: 0, when: 0 };
+  private numberOfStatements = { ex: 0, if: 0, for: 0, while: 0, doWhile: 0, switch: 0, when: 0 };
   private flowStates = [] as string[];
 
   public async run(): Promise<ApexdocflowgenerateResult> {
@@ -173,11 +183,16 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
         If: {} as IfStatement,
         For: {} as ForStatement,
         While: {} as WhileStatement,
+        DoWhile: {} as DoWhileStatement,
         Switch: {} as SwitchStatement,
         ReferencesTo: [] as string[],
       };
       let isInSingleQuote = false;
-      if (methodBlock[idxOfBlockStr] === ";" && !isInSingleQuote) {
+      if (isInSingleQuote) {
+        continue;
+      }
+
+      if (methodBlock[idxOfBlockStr] === ";") {
         statement.Id = "ex" + String(this.numberOfStatements.ex);
         statement.Label = methodBlock.slice(startIndex, idxOfBlockStr + 1);
         statements.push(statement);
@@ -186,56 +201,61 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
       } else if (methodBlock[idxOfBlockStr] === "'" && methodBlock[idxOfBlockStr - 1] !== "/") {
         isInSingleQuote = !isInSingleQuote;
       }
-      if (methodBlock[idxOfBlockStr] === "i" && !isInSingleQuote) {
-        const regEpxOfOperator = /^if[\s\n]*\(/;
-        const blockAfterIf = methodBlock.slice(idxOfBlockStr, methodBlock.length);
-        if (blockAfterIf.match(regEpxOfOperator) !== null) {
-          const ifStatement = this.getIfStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0, 0);
-          statement.If = ifStatement;
-          statement.Id = ifStatement.Id;
-          statements.push(statement);
-          idxOfBlockStr += this.getIfEndIndex(statement.If);
-          startIndex = idxOfBlockStr;
-        }
-      }
-      if (methodBlock[idxOfBlockStr] === "f" && !isInSingleQuote) {
-        const regEpxOfOperator = /^for[\s\n]*\(/;
-        const blockAfterIf = methodBlock.slice(idxOfBlockStr, methodBlock.length);
-        if (blockAfterIf.match(regEpxOfOperator) !== null) {
-          const forStatement = this.getForStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0);
-          statement.For = forStatement;
-          statement.Id = forStatement.Id;
-          statements.push(statement);
-          idxOfBlockStr += forStatement.EndIndex;
-          startIndex = idxOfBlockStr;
-        }
-      }
-      if (methodBlock[idxOfBlockStr] === "s" && !isInSingleQuote) {
-        const regEpxOfOperator = /^switch[\s\n]*on[\s\n]*/;
-        const blockAfterIf = methodBlock.slice(idxOfBlockStr, methodBlock.length);
-        if (blockAfterIf.match(regEpxOfOperator) !== null) {
-          const switchStatement = this.getSwitchStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0);
-          statement.Switch = switchStatement;
-          statement.Id = switchStatement.Id;
-          statements.push(statement);
-          idxOfBlockStr += switchStatement.EndIndex;
-          startIndex = idxOfBlockStr;
-        }
-      }
-      if (methodBlock[idxOfBlockStr] === "w" && !isInSingleQuote) {
-        const regEpxOfOperator = /^while[\s\n]*\(/;
-        const blockAfterIf = methodBlock.slice(idxOfBlockStr, methodBlock.length);
-        if (blockAfterIf.match(regEpxOfOperator) !== null) {
-          const whileStatement = this.getWhileStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0);
-          statement.While = whileStatement;
-          statement.Id = whileStatement.Id;
-          statements.push(statement);
-          idxOfBlockStr += whileStatement.EndIndex;
-          startIndex = idxOfBlockStr;
-        }
+
+      const blockAfterIf = methodBlock.slice(idxOfBlockStr, methodBlock.length);
+      switch (methodBlock[idxOfBlockStr]) {
+        case "i":
+          if (blockAfterIf.match(/^if[\s\n]*\(/) !== null) {
+            const ifStatement = this.getIfStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0, 0);
+            statement.If = ifStatement;
+            statement.Id = ifStatement.Id;
+            statements.push(statement);
+            idxOfBlockStr += this.getIfEndIndex(statement.If);
+            startIndex = idxOfBlockStr;
+          }
+          break;
+        case "f":
+          if (blockAfterIf.match(/^for[\s\n]*\(/) !== null) {
+            const forStatement = this.getForStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0);
+            statement.For = forStatement;
+            statement.Id = forStatement.Id;
+            statements.push(statement);
+            idxOfBlockStr += forStatement.EndIndex;
+            startIndex = idxOfBlockStr;
+          }
+          break;
+        case "s":
+          if (blockAfterIf.match(/^switch[\s\n]*on[\s\n]*/) !== null) {
+            const switchStatement = this.getSwitchStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0);
+            statement.Switch = switchStatement;
+            statement.Id = switchStatement.Id;
+            statements.push(statement);
+            idxOfBlockStr += switchStatement.EndIndex;
+            startIndex = idxOfBlockStr;
+          }
+          break;
+        case "w":
+          if (blockAfterIf.match(/^while[\s\n]*\(/) !== null) {
+            const whileStatement = this.getWhileStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0);
+            statement.While = whileStatement;
+            statement.Id = whileStatement.Id;
+            statements.push(statement);
+            idxOfBlockStr += whileStatement.EndIndex;
+            startIndex = idxOfBlockStr;
+          }
+          break;
+        case "d":
+          if (blockAfterIf.match(/^do[\s\n]*{/) !== null) {
+            const doWhileStatement = this.getDoWhileStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0);
+            statement.DoWhile = doWhileStatement;
+            statement.Id = doWhileStatement.Id;
+            statements.push(statement);
+            idxOfBlockStr += doWhileStatement.EndIndex;
+            startIndex = idxOfBlockStr;
+          }
+          break;
       }
     }
-
     return statements;
   }
 
@@ -369,6 +389,7 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
       If: {} as IfStatement,
       For: {} as ForStatement,
       While: {} as WhileStatement,
+      DoWhile: {} as DoWhileStatement,
       Switch: {} as SwitchStatement,
       ReferencesTo: [] as string[],
     };
@@ -440,6 +461,79 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     return statements;
   }
 
+  private getDoWhileStatementBlock(blockStrs: string, idxOfBlockStr: number): DoWhileStatement {
+    const doWhileStatement = { Id: "", Statements: [] as Statement[], If: {} as IfStatement, Condition: "", ReferencesTo: [] as string[], EndIndex: idxOfBlockStr };
+    doWhileStatement.Id = "doWhile" + String(this.numberOfStatements.doWhile);
+    this.numberOfStatements.doWhile++;
+    let depthOfBlock = 0;
+    let isInDoWhileStatement = false;
+    let isInSingleQuote = false;
+    for (let idxOfBlockStrAfterIdx = 0; idxOfBlockStrAfterIdx < blockStrs.length; idxOfBlockStrAfterIdx++) {
+      if (depthOfBlock === 0 && isInDoWhileStatement) {
+        const regEpxOfOperator = /^[^]*while[\s\n]*\(/;
+        const ifStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
+        const elseStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
+        const statement = {
+          Id: "",
+          Label: "",
+          If: {} as IfStatement,
+          For: {} as ForStatement,
+          While: {} as WhileStatement,
+          DoWhile: {} as DoWhileStatement,
+          Switch: {} as SwitchStatement,
+          ReferencesTo: [] as string[],
+        };
+        ifStatement.Id = "if" + String(this.numberOfStatements.if);
+        this.numberOfStatements.if++;
+        elseStatement.Id = "if" + String(this.numberOfStatements.if);
+        this.numberOfStatements.if++;
+
+        ifStatement.Condition = this.getParenthesis(blockStrs.replace(regEpxOfOperator, ""));
+        ifStatement.Else = elseStatement;
+        doWhileStatement.Statements = this.getStatementsInDoWhile(blockStrs, idxOfBlockStrAfterIdx);
+        statement.If = ifStatement;
+        statement.Id = ifStatement.Id;
+        doWhileStatement.Statements.push(statement);
+        const whileConditionIndx = blockStrs.slice(idxOfBlockStrAfterIdx, blockStrs.length).search(/\(/);
+        doWhileStatement.EndIndex = idxOfBlockStr + idxOfBlockStrAfterIdx + whileConditionIndx + ifStatement.Condition.length;
+        break;
+      }
+      if (blockStrs[idxOfBlockStrAfterIdx] === "'" && blockStrs[idxOfBlockStrAfterIdx - 1] !== "/") {
+        isInSingleQuote = !isInSingleQuote;
+      }
+      if (blockStrs[idxOfBlockStrAfterIdx] === "{" && !isInSingleQuote) {
+        isInDoWhileStatement = true;
+        depthOfBlock++;
+      } else if (blockStrs[idxOfBlockStrAfterIdx] === "}" && !isInSingleQuote) {
+        depthOfBlock--;
+      }
+    }
+    return doWhileStatement;
+  }
+
+  private getStatementsInDoWhile(blockStrs: string, idxOfBlockStrAfterIdx: number): Statement[] {
+    let statements = [];
+    statements = this.collectStatements(blockStrs.slice(0, idxOfBlockStrAfterIdx - 1).replace(/^[\s\n]*do[\s\n]*{/, ""));
+    return statements;
+  }
+
+  /*  private getDoWhileEndIndex(blockStrs: string):number {
+    let endIndex = 0;
+    let depthOfBlock = 0;
+    let isInSingleQuote = false;
+    let isInWhileCondition = false;
+    const regEpxOfOperator = /^[\s\n]*while\s*\(/;
+    for (let idxOfStr = 0; idxOfStr < strAfterSwitch.length; idxOfStr++) {
+      if (blockStrs[idxOfBlockStrAfterIdx] === "'" && blockStrs[idxOfBlockStrAfterIdx - 1] !== "/") {
+        isInSingleQuote = !isInSingleQuote;
+      }
+      if (strAfterSwitch[idxOfStr] === "(") {
+        isInWhileCondition = true;
+      }
+    blockStrs.
+    return endIndex;
+  }
+*/
   private getSwitchStatementBlock(blockStrs: string, idxOfBlockStr: number): SwitchStatement {
     const switchStatement = { Id: "", Expression: "", When: [] as WhenStatement[], ReferencesTo: [] as string[], EndIndex: idxOfBlockStr };
     switchStatement.Id = "switch" + String(this.numberOfStatements.switch);
@@ -715,13 +809,15 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
   private setReferencesTo(statements: Statement[], endStatement: string): void {
     for (let idxOfStatement = 0; idxOfStatement < statements.length - 1; idxOfStatement++) {
       if (Object.keys(statements[idxOfStatement].If).length) {
-        this.setIfReferenecesTo(statements[idxOfStatement].If, statements[idxOfStatement + 1].Id);
+        this.setIfReferencesTo(statements[idxOfStatement].If, statements[idxOfStatement + 1].Id);
       } else if (Object.keys(statements[idxOfStatement].For).length) {
-        this.setForReferenecesTo(statements[idxOfStatement].For, statements[idxOfStatement + 1].Id);
+        this.setForReferencesTo(statements[idxOfStatement].For, statements[idxOfStatement + 1].Id);
       } else if (Object.keys(statements[idxOfStatement].While).length) {
-        this.setWhileReferenecesTo(statements[idxOfStatement].While, statements[idxOfStatement + 1].Id);
+        this.setWhileReferencesTo(statements[idxOfStatement].While, statements[idxOfStatement + 1].Id);
+      } else if (Object.keys(statements[idxOfStatement].DoWhile).length) {
+        this.setDoWhileReferencesTo(statements[idxOfStatement].DoWhile, statements[idxOfStatement + 1].Id);
       } else if (Object.keys(statements[idxOfStatement].Switch).length) {
-        this.setSwitchReferenecesTo(statements[idxOfStatement].Switch, statements[idxOfStatement + 1].Id);
+        this.setSwitchReferencesTo(statements[idxOfStatement].Switch, statements[idxOfStatement + 1].Id);
       } else {
         statements[idxOfStatement].ReferencesTo.push(statements[idxOfStatement + 1].Id);
       }
@@ -732,19 +828,21 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     }
 
     if (Object.keys(statements[statements.length - 1].If).length) {
-      this.setIfReferenecesTo(statements[statements.length - 1].If, endStatement);
+      this.setIfReferencesTo(statements[statements.length - 1].If, endStatement);
     } else if (Object.keys(statements[statements.length - 1].For).length) {
-      this.setForReferenecesTo(statements[statements.length - 1].For, endStatement);
+      this.setForReferencesTo(statements[statements.length - 1].For, endStatement);
     } else if (Object.keys(statements[statements.length - 1].While).length) {
-      this.setWhileReferenecesTo(statements[statements.length - 1].While, endStatement);
+      this.setWhileReferencesTo(statements[statements.length - 1].While, endStatement);
+    } else if (Object.keys(statements[statements.length - 1].DoWhile).length) {
+      this.setDoWhileReferencesTo(statements[statements.length - 1].DoWhile, endStatement);
     } else if (Object.keys(statements[statements.length - 1].Switch).length) {
-      this.setSwitchReferenecesTo(statements[statements.length - 1].Switch, endStatement);
+      this.setSwitchReferencesTo(statements[statements.length - 1].Switch, endStatement);
     } else {
       statements[statements.length - 1].ReferencesTo.push(endStatement);
     }
   }
 
-  private setIfReferenecesTo(ifStatement: IfStatement, endStatement: string): void {
+  private setIfReferencesTo(ifStatement: IfStatement, endStatement: string): void {
     if (ifStatement.Statements.length > 0) {
       ifStatement.ReferencesTo.push(ifStatement.Statements[0].Id);
       this.setReferencesTo(ifStatement.Statements, endStatement);
@@ -763,12 +861,12 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     } else {
       ifStatement.ReferencesTo.push(ifStatement.Else.Id);
     }
-    this.setIfReferenecesTo(ifStatement.Else, endStatement);
+    this.setIfReferencesTo(ifStatement.Else, endStatement);
   }
 
-  private setForReferenecesTo(forStatement: ForStatement, endStatement: string): void {
+  private setForReferencesTo(forStatement: ForStatement, endStatement: string): void {
     forStatement.ReferencesTo.push(forStatement.If.Id);
-    this.setIfReferenecesTo(forStatement.If, endStatement);
+    this.setIfReferencesTo(forStatement.If, endStatement);
     if (forStatement.If.Statements.length > 0) {
       forStatement.If.Statements[forStatement.If.Statements.length - 1].ReferencesTo = [forStatement.If.Id];
     } else {
@@ -776,9 +874,9 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     }
   }
 
-  private setWhileReferenecesTo(whileStatement: WhileStatement, endStatement: string): void {
+  private setWhileReferencesTo(whileStatement: WhileStatement, endStatement: string): void {
     whileStatement.ReferencesTo.push(whileStatement.If.Id);
-    this.setIfReferenecesTo(whileStatement.If, endStatement);
+    this.setIfReferencesTo(whileStatement.If, endStatement);
     if (whileStatement.If.Statements.length > 0) {
       whileStatement.If.Statements[whileStatement.If.Statements.length - 1].ReferencesTo = [whileStatement.If.Id];
     } else {
@@ -786,15 +884,19 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     }
   }
 
-  private setSwitchReferenecesTo(switchStatement: SwitchStatement, endStatement: string): void {
-    for (const whenStatement of switchStatement.When) {
-      switchStatement.ReferencesTo.push(whenStatement.Id);
+  private setDoWhileReferencesTo(doWhileStatement: DoWhileStatement, endStatement: string): void {
+    doWhileStatement.ReferencesTo.push(doWhileStatement.Statements[0].Id);
+    doWhileStatement.Statements[doWhileStatement.Statements.length - 1].If.ReferencesTo = [doWhileStatement.Statements[0].Id];
+    this.setReferencesTo(doWhileStatement.Statements, endStatement);
+  }
 
+  private setSwitchReferencesTo(switchStatement: SwitchStatement, endStatement: string): void {
+    for (const whenStatement of switchStatement.When) {
       if (whenStatement.Statements.length > 0) {
-        whenStatement.ReferencesTo.push(whenStatement.Statements[0].Id);
+        switchStatement.ReferencesTo.push(whenStatement.Statements[0].Id);
         this.setReferencesTo(whenStatement.Statements, endStatement);
       } else {
-        whenStatement.ReferencesTo.push(endStatement);
+        switchStatement.ReferencesTo.push(endStatement);
       }
     }
   }
@@ -811,8 +913,6 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     for (const statement of statements) {
       if (statement.Id.includes("ex")) {
         this.flowStates.push("state " + '"' + statement.Label + '"' + " as " + statement.Id);
-      } else if (statement.Id.includes("switch")) {
-        this.flowStates.push("state " + statement.Switch.Id + " <<choice>>");
       }
 
       for (const referenceTo of statement.ReferencesTo) {
@@ -826,6 +926,9 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
       }
       if (Object.keys(statement.While).length) {
         this.pushWhileDiagramStr(statement.While);
+      }
+      if (Object.keys(statement.DoWhile).length) {
+        this.pushDoWhileDiagramStr(statement.DoWhile);
       }
       if (Object.keys(statement.Switch).length) {
         this.pushSwitchDiagramStr(statement.Switch);
@@ -863,10 +966,21 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     this.pushIfDiagramStr(whileStatement.If);
   }
 
+  private pushDoWhileDiagramStr(whileStatement: DoWhileStatement): void {
+    this.flowStates.push('state "Do while loop" as ' + whileStatement.Id);
+    for (const referenceTo of whileStatement.ReferencesTo) {
+      this.flowStates.push(whileStatement.Id + " --> " + referenceTo);
+    }
+    this.pushDiagramStr(whileStatement.Statements, false);
+  }
+
   private pushSwitchDiagramStr(switchStatement: SwitchStatement): void {
+    this.flowStates.push('state "switch on ' + switchStatement.Expression + '" as ' + switchStatement.Id);
+    this.flowStates.push("state when" + switchStatement.Id + " <<choice>>");
+    this.flowStates.push(switchStatement.Id + " --> when" + switchStatement.Id);
     for (let idxOfReference = 0; idxOfReference < switchStatement.ReferencesTo.length; idxOfReference++) {
-      this.flowStates.push(switchStatement.Id + " --> " + switchStatement.ReferencesTo[idxOfReference] + " : " + switchStatement.When[idxOfReference].Condition);
-      this.flowStates.push(switchStatement.When[idxOfReference].Id + " --> " + switchStatement.When[idxOfReference].ReferencesTo[0]);
+      this.flowStates.push("when" + switchStatement.Id + " --> " + switchStatement.ReferencesTo[idxOfReference] + " : " + switchStatement.When[idxOfReference].Condition);
+      //this.flowStates.push(switchStatement.When[idxOfReference].Id + " --> " + switchStatement.When[idxOfReference].ReferencesTo[0]);
       this.pushDiagramStr(switchStatement.When[idxOfReference].Statements, false);
     }
   }

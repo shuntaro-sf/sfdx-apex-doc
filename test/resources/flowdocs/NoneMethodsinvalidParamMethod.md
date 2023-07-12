@@ -216,7 +216,8 @@ state "
 state " idx++" as ex93
 state "
     Integer i = 0;" as ex94
-state switch0 <<choice>>
+state "switch on i " as switch0
+state whenswitch0 <<choice>>
 state "
         System.debug('1');" as ex95
 state if47 <<choice>>
@@ -378,15 +379,14 @@ if45 --> ex94 : else
 ex92 --> ex93
 ex93 --> if45
 ex94 --> switch0
-switch0 --> when0 : 1
-when0 --> ex95
+switch0 --> whenswitch0
+whenswitch0 --> ex95 : 1
 ex95 --> if47
 if47 --> ex96 : i < 2
 if47 --> ex97 : else
 ex96 --> while0
 ex97 --> while0
-switch0 --> when1 : 2
-when1 --> ex98
+whenswitch0 --> ex98 : 2
 ex98 --> while0
 while0 --> if49
 if49 --> ex99 : i < 10

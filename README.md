@@ -316,9 +316,13 @@ public inherited sharing class NoneMethods {
       System.debug(i);
       i++;
     }
+    do {
+      for (Integer e : new List<Integer> lst) {
+        System.debug('do');
+      }
+    } while (i < 10)
   }
 }
-
 ```
 
 The output diagram:
@@ -345,7 +349,8 @@ state "
 state " idx++" as ex6
 state "
     Integer i = 0;" as ex7
-state switch0 <<choice>>
+state "switch on i " as switch0
+state whenswitch0 <<choice>>
 state "
         System.debug('1');" as ex8
 state if5 <<choice>>
@@ -361,6 +366,14 @@ state "
       System.debug(i);" as ex12
 state "
       i++;" as ex13
+state "Do while loop" as doWhile0
+state "For loop
+Integer e : new List<Integer> lst" as for1
+state if11 <<choice>>
+state "
+        System.debug('do');" as ex14
+state "next e" as ex15
+state if9 <<choice>>
 [*] --> ex0
 ex0 --> if0
 if0 --> ex1 : true
@@ -377,19 +390,26 @@ if3 --> ex7 : else
 ex5 --> ex6
 ex6 --> if3
 ex7 --> switch0
-switch0 --> when0 : 1
-when0 --> ex8
+switch0 --> whenswitch0
+whenswitch0 --> ex8 : 1
 ex8 --> if5
 if5 --> ex9 : i < 2
 if5 --> ex10 : else
 ex9 --> while0
 ex10 --> while0
-switch0 --> when1 : 2
-when1 --> ex11
+whenswitch0 --> ex11 : 2
 ex11 --> while0
 while0 --> if7
 if7 --> ex12 : i < 10
-if7 --> [*] : else
+if7 --> doWhile0 : else
 ex12 --> ex13
 ex13 --> if7
+doWhile0 --> for1
+for1 --> if11
+if11 --> ex14 : collection
+if11 --> if9 : else
+ex14 --> ex15
+ex15 --> if11
+if9 --> for1 : i < 10
+if9 --> [*] : else
 ```
