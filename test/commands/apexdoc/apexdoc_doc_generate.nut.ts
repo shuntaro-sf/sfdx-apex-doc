@@ -1,4 +1,7 @@
 /* eslint-disable @typescript-eslint/quotes */
+import * as fs from "fs";
+import * as path from "path";
+import * as shell from "shelljs";
 import { execCmd, TestSession } from "@salesforce/cli-plugins-testkit";
 import { expect } from "chai";
 import { ApexdocgenerateResult } from "../../../src/commands/apexdoc/doc/generate";
@@ -32,6 +35,13 @@ describe("apexdoc doc generate NUTs", () => {
       "soqlQueryClause SoqlQueryClause object to be converted to a soql query string when extracting records."
     );
     expect(result?.classInfos[0].Methods[1].ReturnValue).to.equal("List<SObject>");
+
+    fs.readdir("test/resources/docs", (err, files) => {
+      if (err) throw err;
+      for (const file of files) {
+        shell.rm(path.join("test/resources/docs", file));
+      }
+    });
   });
 
   it("directory not found", () => {
