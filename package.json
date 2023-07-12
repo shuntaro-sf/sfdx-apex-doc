@@ -1,7 +1,7 @@
 {
   "name": "@shuntaro/sfdx-apex-doc",
   "description": "SFDX plugin to generate Apex doc",
-  "version": "3.1.2",
+  "version": "3.3.0",
   "dependencies": {
     "@oclif/core": "^2.8.2",
     "@salesforce/core": "^3.34.8",

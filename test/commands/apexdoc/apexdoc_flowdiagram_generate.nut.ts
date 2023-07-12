@@ -1,4 +1,7 @@
 /* eslint-disable @typescript-eslint/quotes */
+import * as fs from "fs";
+import * as path from "path";
+import * as shell from "shelljs";
 import { execCmd, TestSession } from "@salesforce/cli-plugins-testkit";
 import { expect } from "chai";
 import { ApexdocflowgenerateResult } from "../../../src/commands/apexdoc/flowdiagram/generate";
@@ -25,6 +28,13 @@ describe("apexdoc flowdiagram generate NUTs", () => {
     expect(result?.classInfos[0].Methods[1].Parameters[0].Name).to.equal("soqlQueryClause");
     expect(result?.classInfos[0].Methods[1].Parameters[0].Type).to.equal("SoqlQueryClause");
     expect(result?.classInfos[0].Methods[1].ReturnValue).to.equal("List<SObject>");
+
+    fs.readdir("test/resources/docs", (err, files) => {
+      if (err) throw err;
+      for (const file of files) {
+        shell.rm(path.join("test/resources/docs", file));
+      }
+    });
   });
 
   it("directory not found", () => {
