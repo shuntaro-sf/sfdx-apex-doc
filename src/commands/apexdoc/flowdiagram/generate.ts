@@ -56,7 +56,15 @@ export type IfStatement = {
   Id: string;
   Statements: Statement[];
   Condition: string;
-  Else: IfStatement;
+  ElseIf: IfStatement;
+  Else: ElseStatement;
+  ReferencesTo: string[];
+  EndIndex: number;
+};
+
+export type ElseStatement = {
+  Id: string;
+  Statements: Statement[];
   ReferencesTo: string[];
   EndIndex: number;
 };
@@ -147,15 +155,7 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
 
     this.collectClassInfos(flags);
     for (const classInfo of this.classInfos) {
-      for (const method of classInfo.Methods) {
-        const statements = this.collectStatements(method.Block);
-        this.setReferencesTo(statements, "[*]");
-        this.pushDiagramStr(statements, true);
-        this.sortFlowStates();
-        const flowDiagramStr = this.flowStates.join("\n");
-        const mermaidStr = "```mermaid\nstateDiagram-v2\n" + flowDiagramStr + "\n```";
-        this.writeFlowDiagramFile(mermaidStr, classInfo.Name + method.Name + Generate.outputExtension, flags);
-      }
+      this.writeFlowDiagramFile(classInfo, classInfo.Name, flags);
     }
 
     return {
@@ -166,27 +166,30 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
   }
 
   private writeFlowDiagramFile(
-    diagramStr: string,
-    fileName: string,
+    classInfo: ClassInfo,
+    preClassNamesOfFileName: string,
     flags: { inputdir: string; outputdir: string } & { [flag: string]: any } & { json: boolean | undefined }
   ): void {
-    writeFileSync(join(flags.outputdir, fileName), diagramStr, "utf-8");
+    for (const method of classInfo.Methods) {
+      this.flowStates = [];
+      const statements = this.collectStatements(method.Block);
+      this.setReferencesTo(statements, "[*]");
+      this.pushDiagramStr(statements, true);
+      this.sortFlowStates();
+      const flowDiagramStr = this.flowStates.join("\n");
+      const mermaidStr = "```mermaid\nstateDiagram-v2\n" + flowDiagramStr + "\n```";
+      writeFileSync(join(flags.outputdir, preClassNamesOfFileName + "." + method.Name + Generate.outputExtension), mermaidStr, "utf-8");
+    }
+    for (const inncerClass of classInfo.Classes) {
+      this.writeFlowDiagramFile(inncerClass, preClassNamesOfFileName + "." + inncerClass.Name, flags);
+    }
   }
 
   private collectStatements(methodBlock: string): Statement[] {
     const statements = [] as Statement[];
     let startIndex = 0;
     for (let idxOfBlockStr = 0; idxOfBlockStr < methodBlock.length; idxOfBlockStr++) {
-      const statement = {
-        Id: "",
-        Label: "",
-        If: {} as IfStatement,
-        For: {} as ForStatement,
-        While: {} as WhileStatement,
-        DoWhile: {} as DoWhileStatement,
-        Switch: {} as SwitchStatement,
-        ReferencesTo: [] as string[],
-      };
+      const statement = this.instantiateStatement();
       let isInSingleQuote = false;
       if (isInSingleQuote) {
         continue;
@@ -194,14 +197,13 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
 
       if (methodBlock[idxOfBlockStr] === ";") {
         statement.Id = "ex" + String(this.numberOfStatements.ex);
-        statement.Label = methodBlock.slice(startIndex, idxOfBlockStr + 1);
+        statement.Label = methodBlock.slice(startIndex, idxOfBlockStr + 1).trim();
         statements.push(statement);
         this.numberOfStatements.ex++;
         startIndex = idxOfBlockStr + 1;
       } else if (methodBlock[idxOfBlockStr] === "'" && methodBlock[idxOfBlockStr - 1] !== "/") {
         isInSingleQuote = !isInSingleQuote;
       }
-
       const blockAfterIf = methodBlock.slice(idxOfBlockStr, methodBlock.length);
       switch (methodBlock[idxOfBlockStr]) {
         case "i":
@@ -246,7 +248,7 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
           break;
         case "d":
           if (blockAfterIf.match(/^do[\s\n]*{/) !== null) {
-            const doWhileStatement = this.getDoWhileStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length), 0);
+            const doWhileStatement = this.getDoWhileStatementBlock(methodBlock.slice(idxOfBlockStr, methodBlock.length));
             statement.DoWhile = doWhileStatement;
             statement.Id = doWhileStatement.Id;
             statements.push(statement);
@@ -260,7 +262,7 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
   }
 
   private getIfStatementBlock(blockStrs: string, idxOfBlockStr: number, numberOfIf: number): IfStatement {
-    const ifStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: idxOfBlockStr };
+    const ifStatement = this.instantiateIfStatement();
     ifStatement.Id = "if" + String(this.numberOfStatements.if);
     this.numberOfStatements.if++;
     let depthOfBlock = 0;
@@ -271,13 +273,14 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
         ifStatement.Condition = this.getConditionOfIf(numberOfIf, blockStrs);
         ifStatement.Statements = this.getStatementsInIf(numberOfIf, blockStrs, idxOfBlockStrAfterIdx);
         const blockAfterIf = blockStrs.slice(idxOfBlockStrAfterIdx, blockStrs.length);
-        const regExpOfElseIf = /^[\s\n]*else\s*if\s*\(/;
-        const regExpOfElse = /^[\s\n]*else\s*/;
+        const regExpOfElseIf = /^[\s\n]*else\s*if[\s\n]*\(/;
+        const regExpOfElse = /^[\s\n]*else[\s\n]*{/;
         if (blockAfterIf.match(regExpOfElseIf) !== null) {
-          ifStatement.Else = this.getIfStatementBlock(blockAfterIf, idxOfBlockStr + idxOfBlockStrAfterIdx, numberOfIf + 1);
+          ifStatement.ElseIf = this.getIfStatementBlock(blockAfterIf, idxOfBlockStr + idxOfBlockStrAfterIdx, numberOfIf + 1);
           break;
         } else if (blockAfterIf.match(regExpOfElse) !== null) {
-          ifStatement.Else = this.getIfStatementBlock(blockAfterIf, idxOfBlockStr + idxOfBlockStrAfterIdx, numberOfIf + 1);
+          ifStatement.Else = this.getElseStatementBlock(blockAfterIf, idxOfBlockStr + idxOfBlockStrAfterIdx);
+          ifStatement.EndIndex = idxOfBlockStr + idxOfBlockStrAfterIdx;
           break;
         } else {
           ifStatement.EndIndex = idxOfBlockStr + idxOfBlockStrAfterIdx;
@@ -295,6 +298,37 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
       }
     }
     return ifStatement;
+  }
+
+  private getElseStatementBlock(blockStrs: string, idxOfBlockStr: number): ElseStatement {
+    const elseStatement = {
+      Id: "",
+      Statements: [] as Statement[],
+      ReferencesTo: [] as string[],
+      EndIndex: idxOfBlockStr,
+    };
+    elseStatement.Id = "if" + String(this.numberOfStatements.if);
+    this.numberOfStatements.if++;
+    let depthOfBlock = 0;
+    let isInElseStatement = false;
+    let isInSingleQuote = false;
+    for (let idxOfBlockStrAfterIdx = 0; idxOfBlockStrAfterIdx < blockStrs.length; idxOfBlockStrAfterIdx++) {
+      if (depthOfBlock === 0 && isInElseStatement) {
+        elseStatement.Statements = this.collectStatements(blockStrs.slice(0, idxOfBlockStrAfterIdx - 1).replace(/^[\s\n]*else[\s\n]*{/, ""));
+        elseStatement.EndIndex = idxOfBlockStr + idxOfBlockStrAfterIdx;
+        break;
+      }
+      if (blockStrs[idxOfBlockStrAfterIdx] === "'" && blockStrs[idxOfBlockStrAfterIdx - 1] !== "/") {
+        isInSingleQuote = !isInSingleQuote;
+      }
+      if (blockStrs[idxOfBlockStrAfterIdx] === "{" && !isInSingleQuote) {
+        isInElseStatement = true;
+        depthOfBlock++;
+      } else if (blockStrs[idxOfBlockStrAfterIdx] === "}" && !isInSingleQuote) {
+        depthOfBlock--;
+      }
+    }
+    return elseStatement;
   }
 
   private getConditionOfIf(numberOfIf: number, blockStrs: string): string {
@@ -335,15 +369,23 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     for (let idxOfBlockStrAfterIdx = 0; idxOfBlockStrAfterIdx < blockStrs.length; idxOfBlockStrAfterIdx++) {
       if (depthOfBlock === 0 && isInForStatement) {
         const regEpxOfOperator = /^[\s\n]*for\s*\(/;
-        const ifStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
-        const elseStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
+        const ifStatement = this.instantiateIfStatement();
+        const elseStatement = {
+          Id: "",
+          Label: "",
+          If: {} as IfStatement,
+          For: {} as ForStatement,
+          While: {} as WhileStatement,
+          DoWhile: {} as DoWhileStatement,
+          Switch: {} as SwitchStatement,
+          ReferencesTo: [] as string[],
+        };
         ifStatement.Id = "if" + String(this.numberOfStatements.if);
         this.numberOfStatements.if++;
         elseStatement.Id = "if" + String(this.numberOfStatements.if);
         this.numberOfStatements.if++;
         ifStatement.Statements = this.getStatementsInFor(blockStrs, idxOfBlockStrAfterIdx);
         ifStatement.Condition = this.getConditionOfFor(blockStrs.replace(regEpxOfOperator, ""));
-        ifStatement.Else = elseStatement;
         const statementOfFor = this.getStatementOfFor(blockStrs);
         ifStatement.Statements.push(statementOfFor);
         forStatement.If = ifStatement;
@@ -366,7 +408,7 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
 
   private getStatementsInFor(blockStrs: string, idxOfBlockStrAfterIdx: number): Statement[] {
     let statements = [];
-    statements = this.collectStatements(blockStrs.slice(0, idxOfBlockStrAfterIdx - 1).replace(/^[\s\n]*for[\s\n]\(.*\)[\s\n]*{/, ""));
+    statements = this.collectStatements(blockStrs.slice(0, idxOfBlockStrAfterIdx - 1).replace(/^[\s\n]*for[\s\n]*\(.*\)[\s\n]*{/, ""));
     return statements;
   }
 
@@ -383,16 +425,7 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
   }
 
   private getStatementOfFor(blockStrs: string): Statement {
-    const statement = {
-      Id: "",
-      Label: "",
-      If: {} as IfStatement,
-      For: {} as ForStatement,
-      While: {} as WhileStatement,
-      DoWhile: {} as DoWhileStatement,
-      Switch: {} as SwitchStatement,
-      ReferencesTo: [] as string[],
-    };
+    const statement = this.instantiateStatement();
     statement.Id = "ex" + String(this.numberOfStatements.ex);
     this.numberOfStatements.ex++;
     const forConditionInParenthesis = this.getParenthesis(blockStrs.replace(/^[\s\n]*for[\s\n]*\(/, ""));
@@ -429,7 +462,7 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     for (let idxOfBlockStrAfterIdx = 0; idxOfBlockStrAfterIdx < blockStrs.length; idxOfBlockStrAfterIdx++) {
       if (depthOfBlock === 0 && isInWhileStatement) {
         const regEpxOfOperator = /^[\s\n]*while\s*\(/;
-        const ifStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
+        const ifStatement = this.instantiateIfStatement();
         const elseStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
         ifStatement.Id = "if" + String(this.numberOfStatements.if);
         this.numberOfStatements.if++;
@@ -437,7 +470,6 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
         this.numberOfStatements.if++;
         ifStatement.Statements = this.getStatementsInWhile(blockStrs, idxOfBlockStrAfterIdx);
         ifStatement.Condition = this.getParenthesis(blockStrs.replace(regEpxOfOperator, ""));
-        ifStatement.Else = elseStatement;
         whileStatement.If = ifStatement;
         whileStatement.EndIndex = idxOfBlockStr + idxOfBlockStrAfterIdx;
         break;
@@ -461,8 +493,8 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     return statements;
   }
 
-  private getDoWhileStatementBlock(blockStrs: string, idxOfBlockStr: number): DoWhileStatement {
-    const doWhileStatement = { Id: "", Statements: [] as Statement[], If: {} as IfStatement, Condition: "", ReferencesTo: [] as string[], EndIndex: idxOfBlockStr };
+  private getDoWhileStatementBlock(blockStrs: string): DoWhileStatement {
+    const doWhileStatement = { Id: "", Statements: [] as Statement[], If: {} as IfStatement, Condition: "", ReferencesTo: [] as string[], EndIndex: 0 };
     doWhileStatement.Id = "doWhile" + String(this.numberOfStatements.doWhile);
     this.numberOfStatements.doWhile++;
     let depthOfBlock = 0;
@@ -471,31 +503,21 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     for (let idxOfBlockStrAfterIdx = 0; idxOfBlockStrAfterIdx < blockStrs.length; idxOfBlockStrAfterIdx++) {
       if (depthOfBlock === 0 && isInDoWhileStatement) {
         const regEpxOfOperator = /^[^]*while[\s\n]*\(/;
-        const ifStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
+        const ifStatement = this.instantiateIfStatement();
         const elseStatement = { Id: "", Statements: [] as Statement[], Condition: "", Else: {} as IfStatement, ReferencesTo: [] as string[], EndIndex: 0 };
-        const statement = {
-          Id: "",
-          Label: "",
-          If: {} as IfStatement,
-          For: {} as ForStatement,
-          While: {} as WhileStatement,
-          DoWhile: {} as DoWhileStatement,
-          Switch: {} as SwitchStatement,
-          ReferencesTo: [] as string[],
-        };
+        const statement = this.instantiateStatement();
         ifStatement.Id = "if" + String(this.numberOfStatements.if);
         this.numberOfStatements.if++;
         elseStatement.Id = "if" + String(this.numberOfStatements.if);
         this.numberOfStatements.if++;
 
         ifStatement.Condition = this.getParenthesis(blockStrs.replace(regEpxOfOperator, ""));
-        ifStatement.Else = elseStatement;
         doWhileStatement.Statements = this.getStatementsInDoWhile(blockStrs, idxOfBlockStrAfterIdx);
         statement.If = ifStatement;
         statement.Id = ifStatement.Id;
         doWhileStatement.Statements.push(statement);
-        const whileConditionIndx = blockStrs.slice(idxOfBlockStrAfterIdx, blockStrs.length).search(/\(/);
-        doWhileStatement.EndIndex = idxOfBlockStr + idxOfBlockStrAfterIdx + whileConditionIndx + ifStatement.Condition.length;
+        const whileConditionIdx = blockStrs.slice(idxOfBlockStrAfterIdx, blockStrs.length).search(/\(/);
+        doWhileStatement.EndIndex = idxOfBlockStrAfterIdx + whileConditionIdx + ifStatement.Condition.length + 3;
         break;
       }
       if (blockStrs[idxOfBlockStrAfterIdx] === "'" && blockStrs[idxOfBlockStrAfterIdx - 1] !== "/") {
@@ -517,23 +539,6 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     return statements;
   }
 
-  /*  private getDoWhileEndIndex(blockStrs: string):number {
-    let endIndex = 0;
-    let depthOfBlock = 0;
-    let isInSingleQuote = false;
-    let isInWhileCondition = false;
-    const regEpxOfOperator = /^[\s\n]*while\s*\(/;
-    for (let idxOfStr = 0; idxOfStr < strAfterSwitch.length; idxOfStr++) {
-      if (blockStrs[idxOfBlockStrAfterIdx] === "'" && blockStrs[idxOfBlockStrAfterIdx - 1] !== "/") {
-        isInSingleQuote = !isInSingleQuote;
-      }
-      if (strAfterSwitch[idxOfStr] === "(") {
-        isInWhileCondition = true;
-      }
-    blockStrs.
-    return endIndex;
-  }
-*/
   private getSwitchStatementBlock(blockStrs: string, idxOfBlockStr: number): SwitchStatement {
     const switchStatement = { Id: "", Expression: "", When: [] as WhenStatement[], ReferencesTo: [] as string[], EndIndex: idxOfBlockStr };
     switchStatement.Id = "switch" + String(this.numberOfStatements.switch);
@@ -628,10 +633,13 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
   }
 
   private getIfEndIndex(ifStatement: IfStatement): number {
-    if (!Object.keys(ifStatement.Else).length) {
+    if (Object.keys(ifStatement.Else).length) {
+      return ifStatement.Else.EndIndex;
+    }
+    if (!Object.keys(ifStatement.ElseIf).length && !Object.keys(ifStatement.Else).length) {
       return ifStatement.EndIndex;
     }
-    return this.getIfEndIndex(ifStatement.Else);
+    return this.getIfEndIndex(ifStatement.ElseIf);
   }
 
   private getParenthesis(blockStr: string): string {
@@ -849,19 +857,24 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     } else {
       ifStatement.ReferencesTo.push(endStatement);
     }
-    if (!Object.keys(ifStatement.Else).length) {
-      return;
-    }
-    if (!Object.keys(ifStatement.Else.Else).length) {
+
+    if (Object.keys(ifStatement.Else).length) {
       if (ifStatement.Else.Statements.length > 0) {
         ifStatement.ReferencesTo.push(ifStatement.Else.Statements[0].Id);
+        this.setReferencesTo(ifStatement.Else.Statements, endStatement);
       } else {
         ifStatement.ReferencesTo.push(endStatement);
       }
-    } else {
-      ifStatement.ReferencesTo.push(ifStatement.Else.Id);
     }
-    this.setIfReferencesTo(ifStatement.Else, endStatement);
+
+    if (Object.keys(ifStatement.ElseIf).length) {
+      ifStatement.ReferencesTo.push(ifStatement.ElseIf.Id);
+
+      this.setIfReferencesTo(ifStatement.ElseIf, endStatement);
+    }
+    if (!Object.keys(ifStatement.Else).length && !Object.keys(ifStatement.ElseIf).length) {
+      ifStatement.ReferencesTo.push(endStatement);
+    }
   }
 
   private setForReferencesTo(forStatement: ForStatement, endStatement: string): void {
@@ -876,12 +889,8 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
 
   private setWhileReferencesTo(whileStatement: WhileStatement, endStatement: string): void {
     whileStatement.ReferencesTo.push(whileStatement.If.Id);
-    this.setIfReferencesTo(whileStatement.If, endStatement);
-    if (whileStatement.If.Statements.length > 0) {
-      whileStatement.If.Statements[whileStatement.If.Statements.length - 1].ReferencesTo = [whileStatement.If.Id];
-    } else {
-      whileStatement.If.ReferencesTo.push(whileStatement.If.Id);
-    }
+    this.setIfReferencesTo(whileStatement.If, whileStatement.If.Id);
+    whileStatement.If.ReferencesTo[1] = endStatement;
   }
 
   private setDoWhileReferencesTo(doWhileStatement: DoWhileStatement, endStatement: string): void {
@@ -937,17 +946,20 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
   }
 
   private pushIfDiagramStr(ifStatement: IfStatement): void {
+    this.flowStates.push("state " + ifStatement.Id + " <<choice>>");
+    this.flowStates.push(ifStatement.Id + " --> " + ifStatement.ReferencesTo[0] + " : " + ifStatement.Condition);
+    this.pushDiagramStr(ifStatement.Statements, false);
     if (Object.keys(ifStatement.Else).length) {
-      this.flowStates.push("state " + ifStatement.Id + " <<choice>>");
-      this.flowStates.push(ifStatement.Id + " --> " + ifStatement.ReferencesTo[0] + " : " + ifStatement.Condition);
       this.flowStates.push(ifStatement.Id + " --> " + ifStatement.ReferencesTo[1] + " : else");
-      this.pushDiagramStr(ifStatement.Statements, false);
+      this.pushDiagramStr(ifStatement.Else.Statements, false);
     }
-    if (!Object.keys(ifStatement.Else).length) {
-      this.pushDiagramStr(ifStatement.Statements, false);
-      return;
+    if (!Object.keys(ifStatement.ElseIf).length && !Object.keys(ifStatement.Else).length) {
+      this.flowStates.push(ifStatement.Id + " --> " + ifStatement.ReferencesTo[1] + " : else");
     }
-    this.pushIfDiagramStr(ifStatement.Else);
+    if (Object.keys(ifStatement.ElseIf).length) {
+      this.flowStates.push(ifStatement.Id + " --> " + ifStatement.ReferencesTo[1] + " : else");
+      this.pushIfDiagramStr(ifStatement.ElseIf);
+    }
   }
 
   private pushForDiagramStr(forStatement: ForStatement): void {
@@ -980,7 +992,6 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     this.flowStates.push(switchStatement.Id + " --> when" + switchStatement.Id);
     for (let idxOfReference = 0; idxOfReference < switchStatement.ReferencesTo.length; idxOfReference++) {
       this.flowStates.push("when" + switchStatement.Id + " --> " + switchStatement.ReferencesTo[idxOfReference] + " : " + switchStatement.When[idxOfReference].Condition);
-      //this.flowStates.push(switchStatement.When[idxOfReference].Id + " --> " + switchStatement.When[idxOfReference].ReferencesTo[0]);
       this.pushDiagramStr(switchStatement.When[idxOfReference].Statements, false);
     }
   }
@@ -989,5 +1000,32 @@ export default class Generate extends SfCommand<ApexdocflowgenerateResult> {
     const states = this.flowStates.filter((e) => e.startsWith("state"));
     const flows = this.flowStates.filter((e) => !e.startsWith("state"));
     this.flowStates = states.concat(flows);
+  }
+
+  private instantiateStatement(): Statement {
+    const statement = {
+      Id: "",
+      Label: "",
+      If: {} as IfStatement,
+      For: {} as ForStatement,
+      While: {} as WhileStatement,
+      DoWhile: {} as DoWhileStatement,
+      Switch: {} as SwitchStatement,
+      ReferencesTo: [] as string[],
+    };
+    return statement;
+  }
+
+  private instantiateIfStatement(): IfStatement {
+    const ifStatement = {
+      Id: "",
+      Statements: [] as Statement[],
+      Condition: "",
+      ElseIf: {} as IfStatement,
+      Else: {} as ElseStatement,
+      ReferencesTo: [] as string[],
+      EndIndex: 0,
+    };
+    return ifStatement;
   }
 }
