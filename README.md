@@ -176,7 +176,7 @@ EXAMPLES
 
 # Example
 
-## apexdoc:generate
+## sf apexdoc doc generate
 
 The example of formatting the following apex class: DynamicDao.cls.
 
@@ -277,7 +277,7 @@ RETURN VALUE
   List<SObject>
 ```
 
-# flowdiagram:generate
+# sf apexdoc flowdiagram generate`
 
 This command is in development not tested out at all! Thefore, we cannot ensure everything works fine.
 
@@ -412,4 +412,370 @@ ex14 --> ex15
 ex15 --> if11
 if9 --> for1 : i < 10
 if9 --> [*] : else
+```
+
+The example of if statements:
+
+```apex
+public void nests() {
+  if (true) {
+    if (true) {
+      if (true) {
+        if (true) {
+          if (true) {
+            if (true) {
+              if (true) {
+                System.debug('nest');
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+```mermaid
+stateDiagram-v2
+state if13 <<choice>>
+state if14 <<choice>>
+state if15 <<choice>>
+state if16 <<choice>>
+state if17 <<choice>>
+state if18 <<choice>>
+state if19 <<choice>>
+state "System.debug('nest');" as ex16
+[*] --> if13
+if13 --> if14 : true
+if14 --> if15 : true
+if15 --> if16 : true
+if16 --> if17 : true
+if17 --> if18 : true
+if18 --> if19 : true
+if19 --> ex16 : true
+ex16 --> [*]
+if19 --> [*] : else
+if18 --> [*] : else
+if17 --> [*] : else
+if16 --> [*] : else
+if15 --> [*] : else
+if14 --> [*] : else
+if13 --> [*] : else
+```
+
+The example of for statements:
+
+```apex
+public void fors() {
+  for (Integer i = 0; i < 100; i++) {
+    for (Integer j = 0; j < 100; j++) {
+      for (Integer k = 0; k < 100; k++) {
+        for (Integer l = 0; l < 100; l++) {
+          for (Integer m = 0; m < 100; m++) {
+            System.debug('for');
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+```mermaid
+stateDiagram-v2
+state "For loop
+Integer i = 0" as for2
+state if20 <<choice>>
+state "For loop
+Integer j = 0" as for3
+state if22 <<choice>>
+state "For loop
+Integer k = 0" as for4
+state if24 <<choice>>
+state "For loop
+Integer l = 0" as for5
+state if26 <<choice>>
+state "For loop
+Integer m = 0" as for6
+state if28 <<choice>>
+state "System.debug('for');" as ex25
+state " m++" as ex26
+state " l++" as ex27
+state " k++" as ex28
+state " j++" as ex29
+state " i++" as ex30
+[*] --> for2
+for2 --> if20
+if20 --> for3 :  i < 100
+for3 --> if22
+if22 --> for4 :  j < 100
+for4 --> if24
+if24 --> for5 :  k < 100
+for5 --> if26
+if26 --> for6 :  l < 100
+for6 --> if28
+if28 --> ex25 :  m < 100
+ex25 --> ex26
+ex26 --> if28
+if28 --> ex27 : else
+ex27 --> if26
+if26 --> ex28 : else
+ex28 --> if24
+if24 --> ex29 : else
+ex29 --> if22
+if22 --> ex30 : else
+ex30 --> if20
+if20 --> [*] : else
+```
+
+The example of switch statements:
+
+```apex
+public void switches(){
+  Integer i = 0;
+  switch on i {
+    when 0 {
+      System.debug(i);
+    }
+    when 1 {
+      System.debug(i);
+    }
+    when 2 {
+      System.debug(i);
+    }
+    when 3 {
+      System.debug(i);
+    }
+    when 4 {
+      System.debug(i);
+    }
+    when 5 {
+      System.debug(i);
+    }
+    when else {
+      System.debug(i);
+    }
+  }
+}
+```
+
+```mermaid
+stateDiagram-v2
+state "Integer i = 0;" as ex17
+state "switch on i " as switch1
+state whenswitch1 <<choice>>
+state "System.debug(i);" as ex18
+state "System.debug(i);" as ex19
+state "System.debug(i);" as ex20
+state "System.debug(i);" as ex21
+state "System.debug(i);" as ex22
+state "System.debug(i);" as ex23
+state "System.debug(i);" as ex24
+[*] --> ex17
+ex17 --> switch1
+switch1 --> whenswitch1
+whenswitch1 --> ex18 : 0
+ex18 --> [*]
+whenswitch1 --> ex19 : 1
+ex19 --> [*]
+whenswitch1 --> ex20 : 2
+ex20 --> [*]
+whenswitch1 --> ex21 : 3
+ex21 --> [*]
+whenswitch1 --> ex22 : 4
+ex22 --> [*]
+whenswitch1 --> ex23 : 5
+ex23 --> [*]
+whenswitch1 --> ex24 : else
+ex24 --> [*]
+```
+
+Super nests:
+
+```apex
+public void superNests(){
+  String str = 'ddd';
+  if (str == 'ddd') {
+    for (Integer i = 0; i < 10; i++) {
+      if (str == 'ddd') {
+        System.debug('first');
+      } else if (str == 'dd') {
+        System.debug('second');
+      }
+    }
+  } else if (str == 'dd') {
+    while (true) {
+      if (str == 'ddd') {
+        for (Integer int : new List<Integer> lst) {
+          System.debug('third');
+        }
+      }
+    }
+  } else if (str == 'ssdd') {
+    do {
+      if (str == 'dddss') {
+        for (Integer idx = 0; idx < 100; idx++) {
+          System.debug('fourth');
+        }
+      }
+    } while (true);
+  } else if (str == 'sdsdd') {
+    for (Integer idx = 0; idx < 100; idx++) {
+      if (str == 'ddddss') {
+        System.debug('fourth');
+      }
+    }
+  } else {
+    switch on str {
+      when 'ddd' {
+        for (Integer idx = 0; idx < 100; idx++) {
+          System.debug('fourth');
+          if (str == 'ddd') {
+            System.debug('fourth');
+          } else {
+            System.debug('fifth');
+          }
+        }
+      }
+      when 'dd' {
+        if (str == 'ddd') {
+          System.debug('sixth');
+        } else {
+          System.debug('seventh');
+        }
+      }
+      when else {
+        if (str == 'ddd') {
+          System.debug('eitgth');
+        } else {
+          System.debug('nineth');
+        }
+      }
+    }
+  }
+}
+```
+
+```mermaid
+stateDiagram-v2
+state "String str = 'ddd';" as ex31
+state if30 <<choice>>
+state "For loop
+Integer i = 0" as for7
+state if31 <<choice>>
+state if33 <<choice>>
+state "System.debug('first');" as ex32
+state if34 <<choice>>
+state "System.debug('second');" as ex33
+state " i++" as ex34
+state if35 <<choice>>
+state "while loop" as while1
+state if36 <<choice>>
+state if38 <<choice>>
+state "For loop
+Integer int : new List<Integer> lst" as for8
+state if39 <<choice>>
+state "System.debug('third');" as ex35
+state "next int" as ex36
+state if41 <<choice>>
+state "Do while loop" as doWhile1
+state if44 <<choice>>
+state "For loop
+Integer idx = 0" as for9
+state if45 <<choice>>
+state "System.debug('fourth');" as ex37
+state " idx++" as ex38
+state if42 <<choice>>
+state if47 <<choice>>
+state "For loop
+Integer idx = 0" as for10
+state if48 <<choice>>
+state if50 <<choice>>
+state "System.debug('fourth');" as ex39
+state " idx++" as ex40
+state "switch on str " as switch2
+state whenswitch2 <<choice>>
+state "For loop
+Integer idx = 0" as for11
+state if52 <<choice>>
+state "System.debug('fourth');" as ex41
+state if54 <<choice>>
+state "System.debug('fourth');" as ex42
+state "System.debug('fifth');" as ex43
+state " idx++" as ex44
+state if56 <<choice>>
+state "System.debug('sixth');" as ex45
+state "System.debug('seventh');" as ex46
+state if58 <<choice>>
+state "System.debug('eitgth');" as ex47
+state "System.debug('nineth');" as ex48
+[*] --> ex31
+ex31 --> if30
+if30 --> for7 : str == 'ddd'
+for7 --> if31
+if31 --> if33 :  i < 10
+if33 --> ex32 : str == 'ddd'
+ex32 --> ex34
+if33 --> if34 : else
+if34 --> ex33 : str == 'dd'
+ex33 --> ex34
+if34 --> ex34 : else
+ex34 --> if31
+if31 --> [*] : else
+if30 --> if35 : else
+if35 --> while1 : str == 'dd'
+while1 --> if36
+if36 --> if38 : true
+if38 --> for8 : str == 'ddd'
+for8 --> if39
+if39 --> ex35 : collection
+ex35 --> ex36
+ex36 --> if39
+if39 --> if36 : else
+if38 --> if36 : else
+if36 --> [*] : else
+if35 --> if41 : else
+if41 --> doWhile1 : str == 'ssdd'
+doWhile1 --> if44
+if44 --> for9 : str == 'dddss'
+for9 --> if45
+if45 --> ex37 :  idx < 100
+ex37 --> ex38
+ex38 --> if45
+if45 --> if42 : else
+if44 --> if42 : else
+if42 --> if44 : true
+if42 --> [*] : else
+if41 --> if47 : else
+if47 --> for10 : str == 'sdsdd'
+for10 --> if48
+if48 --> if50 :  idx < 100
+if50 --> ex39 : str == 'ddddss'
+ex39 --> ex40
+if50 --> ex40 : else
+ex40 --> if48
+if48 --> [*] : else
+if47 --> switch2 : else
+switch2 --> whenswitch2
+whenswitch2 --> for11 : 'ddd'
+for11 --> if52
+if52 --> ex41 :  idx < 100
+ex41 --> if54
+if54 --> ex42 : str == 'ddd'
+ex42 --> ex44
+if54 --> ex43 : else
+ex43 --> ex44
+ex44 --> if52
+if52 --> [*] : else
+whenswitch2 --> if56 : 'dd'
+if56 --> ex45 : str == 'ddd'
+ex45 --> [*]
+if56 --> ex46 : else
+ex46 --> [*]
+whenswitch2 --> if58 : else
+if58 --> ex47 : str == 'ddd'
+ex47 --> [*]
+if58 --> ex48 : else
+ex48 --> [*]
 ```
